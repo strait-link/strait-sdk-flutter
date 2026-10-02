@@ -24,7 +24,7 @@ final device = DeviceFields(
 );
 
 final result = await resolveDeferredLink(
-  appId: 'YOUR_APP_ID',
+  publishableKey: 'bk_pub_live_…', // Dashboard → Get started → Publishable key
   endpoint: 'https://go.yourbrand.com',
   platform: Platform.isIOS ? 'ios' : 'android',
   device: device,
@@ -35,6 +35,9 @@ if (result.matched && result.longUrl != null) {
   // route to result.longUrl!
 }
 ```
+
+> **Publishable key:** Dashboard → Get started → Publishable key (`bk_pub_live_…`).
+> It's safe to include in your app. Never put your secret key (`bk_live_…`) in an app.
 
 > **Timezone:** the signature needs the IANA name (e.g. `Asia/Kolkata`). Get it
 > from a plugin like `flutter_timezone`; `DateTime.timeZoneName` is an

@@ -61,9 +61,12 @@ String? parseStraitLink(String? referrer) {
 /// Resolve the deferred deep link this device clicked before installing.
 ///   • Android with a `strait_link` install referrer → /v1/referrer (exact).
 ///   • otherwise → /v1/match (fingerprint).
+/// [publishableKey] is your workspace publishable key (`bk_pub_live_…` or
+/// `bk_pub_test_…`) from Dashboard → Get started. It is safe to ship in apps;
+/// never pass your secret key (`bk_live_…`).
 /// Never throws; returns [MatchResult.none] on any error.
 Future<MatchResult> resolveDeferredLink({
-  required String appId,
+  required String publishableKey,
   required String endpoint,
   required String platform,
   required DeviceFields device,
@@ -92,13 +95,16 @@ Future<MatchResult> resolveDeferredLink({
     if (platform == 'android') {
       final linkId = parseStraitLink(installReferrer);
       if (linkId != null) {
-        final r = await post('/v1/referrer',
-            {'appId': appId, 'linkId': linkId, 'platform': platform});
+        final r = await post('/v1/referrer', {
+          'publishableKey': publishableKey,
+          'linkId': linkId,
+          'platform': platform,
+        });
         if (r.matched) return r;
       }
     }
     return await post('/v1/match', {
-      'appId': appId,
+      'publishableKey': publishableKey,
       'platform': platform,
       ...device.toJson(),
     });

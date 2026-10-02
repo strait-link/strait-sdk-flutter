@@ -4,6 +4,8 @@ import 'package:http/testing.dart';
 import 'package:test/test.dart';
 import 'package:strait_sdk/src/strait.dart';
 
+const key = 'bk_pub_test_0123456789abcdef0123456789abcdef';
+
 const device = DeviceFields(
   screenWidth: 393,
   pixelRatio: 3,
@@ -26,15 +28,17 @@ void main() {
   group('resolveDeferredLink — Android deterministic', () {
     test('uses /v1/referrer when referrer carries a strait_link', () async {
       late Uri called;
+      late Map<String, dynamic> body;
       final client = MockClient((req) async {
         called = req.url;
+        body = jsonDecode(req.body) as Map<String, dynamic>;
         return http.Response(
           jsonEncode({'matched': true, 'longUrl': 'https://app/x', 'matchMethod': 'install_referrer'}),
           200,
         );
       });
       final r = await resolveDeferredLink(
-        appId: 'ten_1',
+        publishableKey: key,
         endpoint: 'https://go.example.com/',
         platform: 'android',
         device: device,
@@ -43,6 +47,9 @@ void main() {
       );
       expect(r.matchMethod, equals('install_referrer'));
       expect(called.path, equals('/v1/referrer'));
+      expect(body['publishableKey'], equals(key));
+      expect(body.containsKey('appId'), isFalse);
+      expect(body['linkId'], equals('lnk_42'));
     });
 
     test('falls back to /v1/match when referrer lookup misses', () async {
@@ -58,7 +65,7 @@ void main() {
         );
       });
       final r = await resolveDeferredLink(
-        appId: 'ten_1',
+        publishableKey: key,
         endpoint: 'https://go.example.com',
         platform: 'android',
         device: device,
@@ -71,7 +78,7 @@ void main() {
   });
 
   group('resolveDeferredLink — iOS fingerprint', () {
-    test('posts device fields + appId to /v1/match', () async {
+    test('posts device fields + publishableKey to /v1/match', () async {
       late Map<String, dynamic> body;
       final client = MockClient((req) async {
         body = jsonDecode(req.body) as Map<String, dynamic>;
@@ -81,14 +88,15 @@ void main() {
         );
       });
       final r = await resolveDeferredLink(
-        appId: 'ten_1',
+        publishableKey: key,
         endpoint: 'https://go.example.com',
         platform: 'ios',
         device: device,
         client: client,
       );
       expect(r.longUrl, equals('https://app/z'));
-      expect(body['appId'], equals('ten_1'));
+      expect(body['publishableKey'], equals(key));
+      expect(body.containsKey('appId'), isFalse);
       expect(body['platform'], equals('ios'));
       expect(body['screenWidth'], equals(393));
     });
@@ -96,7 +104,7 @@ void main() {
     test('never throws on network error', () async {
       final client = MockClient((_) async => throw Exception('offline'));
       final r = await resolveDeferredLink(
-        appId: 'ten_1',
+        publishableKey: key,
         endpoint: 'https://go.example.com',
         platform: 'ios',
         device: device,
