@@ -5,6 +5,7 @@
 /// here silently breaks deferred matching. Two cross-language traps handled below:
 ///   • h32 uses 32-bit SIGNED wraparound (JS `h |= 0`) → `.toSigned(32)`.
 ///   • numStr mirrors JS `String(Number)` (no trailing ".0" on whole numbers).
+library;
 
 class Signature {
   final String coreRaw;

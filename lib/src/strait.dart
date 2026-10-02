@@ -1,6 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
+import 'core.dart';
+
+export 'core.dart' show parseStraitLink;
+
 /// Coarse, privacy-clean device fields the server hashes into a match signature.
 /// (The server adds the IP it observes; the client never sends one.)
 class DeviceFields {
@@ -47,15 +51,6 @@ class MatchResult {
         longUrl: j['longUrl'] as String?,
         linkId: j['linkId'] as String?,
       );
-}
-
-/// Extract the Strait link id from a Play Install Referrer string.
-String? parseStraitLink(String? referrer) {
-  if (referrer == null || referrer.isEmpty) return null;
-  // referrer is application/x-www-form-urlencoded, e.g. "strait_link=lnk_1&utm=..."
-  final params = Uri.splitQueryString(referrer);
-  final v = params['strait_link'];
-  return (v == null || v.isEmpty) ? null : v;
 }
 
 /// Resolve the deferred deep link this device clicked before installing.

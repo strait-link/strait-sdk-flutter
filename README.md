@@ -1,39 +1,137 @@
 # strait_sdk (Flutter / Dart)
 
-Deferred deep linking for Flutter — the user taps your link, installs the app,
-and lands on the right screen. No clipboard paste banner.
+Deep linking for Flutter: verified links and custom schemes open the right
+screen, and deferred links survive the install (the user taps your link,
+installs the app, and lands on the right screen). No clipboard paste banner.
 
 Part of [Strait](../). The match signature is a Dart port of
 [`shared-spec`](../shared-spec) and is checked against the **same golden vectors**
 as the server, web, and React Native SDKs (run by `dart test` in CI) — so the
 signature can never drift across languages.
 
-## Use
+## Use (recommended): `StraitLinks`
+
+`StraitLinks` is pure Dart. Your app hands it the launch URL, a stream of
+later URLs and a stream of lifecycle states; it resolves short links, labels
+the app state, runs the deferred check once per install, and emits one
+`LinkEvent` for every case. Typical wiring with
+[`app_links`](https://pub.dev/packages/app_links),
+[`shared_preferences`](https://pub.dev/packages/shared_preferences),
+[`play_install_referrer`](https://pub.dev/packages/play_install_referrer) and
+[`flutter_timezone`](https://pub.dev/packages/flutter_timezone):
 
 ```dart
-import 'package:strait_sdk/strait_sdk.dart';
-import 'dart:ui';
+import 'dart:async';
 import 'dart:io' show Platform;
+import 'dart:ui';
 
-final view = PlatformDispatcher.instance.views.first;
-final device = DeviceFields(
-  screenWidth: (view.physicalSize.width / view.devicePixelRatio).round(),
-  pixelRatio: view.devicePixelRatio,
-  language: PlatformDispatcher.instance.locale.languageCode,
-  timezone: DateTime.now().timeZoneName, // see note below
-);
+import 'package:app_links/app_links.dart';
+import 'package:strait_sdk/strait_sdk.dart';
+import 'package:flutter/widgets.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
+import 'package:play_install_referrer/play_install_referrer.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+/// Persists the once-per-install flag.
+class PrefsStore implements KeyValueStore {
+  PrefsStore(this.prefs);
+  final SharedPreferences prefs;
+  @override
+  Future<String?> get(String key) async => prefs.getString(key);
+  @override
+  Future<void> set(String key, String value) => prefs.setString(key, value);
+}
+
+/// Feeds Flutter lifecycle changes to the SDK.
+class LifecycleFeed with WidgetsBindingObserver {
+  final _ctl = StreamController<AppLifecycle>.broadcast(sync: true);
+  Stream<AppLifecycle> get stream => _ctl.stream;
+  LifecycleFeed() { WidgetsBinding.instance.addObserver(this); }
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState s) => _ctl.add(switch (s) {
+        AppLifecycleState.resumed => AppLifecycle.active,
+        AppLifecycleState.inactive => AppLifecycle.inactive,
+        _ => AppLifecycle.background, // hidden, paused, detached
+      });
+}
+
+Future<StraitLinks> startStrait() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final timezone = await FlutterTimezone.getLocalTimezone(); // IANA, e.g. Asia/Kolkata
+  final strait = StraitLinks(
+    publishableKey: 'bk_pub_live_…', // Dashboard → Get started
+    endpoint: 'https://go.yourbrand.com',
+    linkHosts: const ['links.yourbrand.com'], // extra custom domains, if any
+    platform: Platform.isIOS ? 'ios' : Platform.isAndroid ? 'android' : 'other',
+    storage: PrefsStore(await SharedPreferences.getInstance()),
+    installReferrer: () async =>
+        Platform.isAndroid ? (await PlayInstallReferrer.installReferrer).installReferrer : null,
+    deviceFields: () {
+      final view = PlatformDispatcher.instance.views.first;
+      return DeviceFields(
+        // Logical width rounded like the browser does (contract B2).
+        screenWidth: browserScreenWidth(view.physicalSize.width / view.devicePixelRatio),
+        pixelRatio: view.devicePixelRatio,
+        language: PlatformDispatcher.instance.locale.toLanguageTag(),
+        timezone: timezone,
+      );
+    },
+  );
+
+  // Subscribe before start() so nothing is missed (past events replay anyway).
+  strait.onLinkStart.listen((s) { /* show "Opening link…" until event s.id */ });
+  strait.onLink.listen((e) {
+    if (e.matched && e.path != null) {
+      // navigate to e.path with e.params; e.appState is closed/background/foreground
+    }
+  });
+
+  final appLinks = AppLinks();
+  final initial = await appLinks.getInitialLink();
+  await strait.start(
+    initialUrl: initial?.toString(),
+    urls: appLinks.uriLinkStream.map((u) => u.toString()),
+    lifecycle: LifecycleFeed().stream,
+  );
+  return strait;
+}
+```
+
+Notes:
+
+- `app_links` 6+ also emits the launch link on `uriLinkStream`; `start()`
+  ignores that first echo, so the launch link is handled once.
+- Analytics: `strait.trackEvent('purchase', value: 49.99, currency: 'USD', linkId: e.linkId)`.
+- Fingerprint debug: `strait.reportFingerprint()` then `strait.compareFingerprint()`.
+- `strait.checkDeferred()` re-runs the deferred check (debugging); it doesn't
+  touch the once-per-install flag.
+- `flutter_timezone` 4.x returns a `TimezoneInfo`; use `.identifier`.
+
+### `LinkEvent`
+
+| Field | Meaning |
+|---|---|
+| `kind` | `direct` (app opened by a link) / `deferred` (tapped before install) |
+| `route` | `app_link`, `custom_scheme`, `install_referrer`, `fingerprint` (`route.value`) |
+| `appState` | `closed`, `background`, `foreground` |
+| `matched`, `reason` | `reason`: `not_found`, `expired`, `password_protected`, `no_match`, `network`, `invalid_url` |
+| `rawUrl` | the URL the OS handed the app |
+| `url`, `path`, `params` | the destination to navigate to |
+| `linkId`, `ms`, `at`, `id` | link id, resolve time (ms), arrival time (epoch ms), id shared with `LinkStart` |
+
+## Use (legacy): `resolveDeferredLink`
+
+Still supported for apps that only want the deferred match:
+
+```dart
 final result = await resolveDeferredLink(
-  publishableKey: 'bk_pub_live_…', // Dashboard → Get started → Publishable key
+  publishableKey: 'bk_pub_live_…',
   endpoint: 'https://go.yourbrand.com',
   platform: Platform.isIOS ? 'ios' : 'android',
-  device: device,
-  installReferrer: await readPlayInstallReferrer(), // Android only; null otherwise
+  device: device, // DeviceFields as above
+  installReferrer: referrer, // Android only; null otherwise
 );
-
-if (result.matched && result.longUrl != null) {
-  // route to result.longUrl!
-}
+if (result.matched && result.longUrl != null) { /* route */ }
 ```
 
 > **Publishable key:** Dashboard → Get started → Publishable key (`bk_pub_live_…`).
@@ -42,6 +140,19 @@ if (result.matched && result.longUrl != null) {
 > **Timezone:** the signature needs the IANA name (e.g. `Asia/Kolkata`). Get it
 > from a plugin like `flutter_timezone`; `DateTime.timeZoneName` is an
 > abbreviation on some platforms and won't match. Pass the IANA string.
+
+## SDK contract
+
+Implements every behaviour in
+[`shared-spec/SDK-CONTRACT.md`](../shared-spec/SDK-CONTRACT.md):
+B1 (publishableKey on every call) · B2 (`browserScreenWidth`) · B3 (short links
+→ `/v1/resolve`, engine reason reported) · B4 (`classifyUrl`) · B5
+(`AppStateTracker`) · B6 (once per install, skipped-but-marked on a link
+launch) · B7 (Install Referrer → `/v1/referrer`, else `/v1/match`) · B8 (iOS
+`/v1/match`) · B9 (one `LinkEvent` type, replay, `onLinkStart`) · B10 (never
+throws) · B11 (`jsonEncode`) · B12 (`splitUrl`, no `Uri` parsing) · B13
+(`trackEvent`, `reportFingerprint`, `compareFingerprint`). Both shared vector
+files are asserted in `dart test`.
 
 ## How it matches
 
@@ -60,5 +171,7 @@ and computes the signature.
 dart pub get && dart test
 ```
 
-The golden-vector suite (`test/signature_test.dart`) enforces byte-for-byte
-parity with the other SDKs.
+`test/signature_test.dart` (signature) and `test/conformance_test.dart`
+(URL / referrer / app-state logic) enforce byte-for-byte parity with the other
+SDKs; `test/client_test.dart` covers the client scenarios with a fake engine and
+fake lifecycle.
