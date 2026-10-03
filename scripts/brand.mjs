@@ -240,6 +240,8 @@ export function plan(root) {
   // 3. LICENSE (keeps the year it was first written).
   const year = /Copyright \(c\) (\d{4}(?:-\S+)?)/.exec(read(root, 'LICENSE') ?? '')?.[1] ?? String(new Date().getFullYear());
   put('LICENSE', licenseText(id.legalName, year));
+  // A Unity package's root is src/, so it carries its own copy.
+  if (id.kind === 'unity') put('src/LICENSE.md', licenseText(id.legalName, year));
 
   // A renamed file's edits belong to its new path.
   for (const [from, to] of renames) {
