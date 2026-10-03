@@ -9,6 +9,16 @@ Part of [Strait](../). The match signature is a Dart port of
 as the server, web, and React Native SDKs (run by `dart test` in CI) — so the
 signature can never drift across languages.
 
+## Install
+
+<!-- brand:install -->
+```sh
+dart pub add strait_sdk      # Flutter apps: flutter pub add strait_sdk
+```
+<!-- /brand:install -->
+
+Pure Dart (no Flutter dependency), so it works in Flutter apps and Dart servers alike.
+
 ## Use (recommended): `StraitLinks`
 
 `StraitLinks` is pure Dart. Your app hands it the launch URL, a stream of

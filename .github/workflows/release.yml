@@ -1,0 +1,37 @@
+name: Release
+# Push a tag vX.Y.Z (matching pubspec.yaml "version") to publish to pub.dev.
+# Uses pub.dev automated publishing (GitHub OIDC, no stored secret). Inert until the
+# repo variable PUB_DEV_PUBLISHING is "true": tests still run, publish is skipped.
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+      - run: dart pub get
+      - name: Tag matches pubspec.yaml version
+        run: |
+          v="$(sed -n 's/^version: *//p' pubspec.yaml)"
+          [ "$GITHUB_REF_NAME" = "v$v" ] || { echo "::error::tag $GITHUB_REF_NAME does not match pubspec.yaml version $v"; exit 1; }
+      - run: dart analyze --fatal-infos
+      - run: dart test
+      - run: node scripts/brand.mjs
+      - name: Brand is final (only when publishing is switched on)
+        if: vars.PUB_DEV_PUBLISHING == 'true'
+        run: node scripts/brand.mjs --release
+      - run: dart pub publish --dry-run
+      - if: vars.PUB_DEV_PUBLISHING != 'true'
+        run: echo "::notice::PUB_DEV_PUBLISHING repo variable is not 'true', so nothing was published (see PUBLISHING.md)."
+  publish:
+    needs: verify
+    if: vars.PUB_DEV_PUBLISHING == 'true'
+    permissions:
+      id-token: write # pub.dev verifies this workflow's OIDC token
+    uses: dart-lang/setup-dart/.github/workflows/publish.yml@v1

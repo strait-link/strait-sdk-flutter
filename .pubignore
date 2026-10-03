@@ -1,0 +1,12 @@
+# .pubignore replaces .gitignore for `dart pub publish`, so repeat those entries.
+.dart_tool/
+.packages
+pubspec.lock
+build/
+.DS_Store
+# Repo-only files: tests + fixtures, CI, release tooling.
+test/
+.github/
+scripts/
+brand.json
+PUBLISHING.md

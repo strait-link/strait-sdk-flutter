@@ -22,6 +22,16 @@
   `shouldRetryReport`, `newOpenId`, `openQueueMax`, `openQueueMaxAgeMs` —
   checked against conformance vectors v2.
 
+### Packaging
+
+- Publish-ready for pub.dev: homepage / repository / issue_tracker / topics,
+  MIT `LICENSE`, an `example/`, and `.pubignore` so tests, fixtures and repo
+  tooling don't ship. `dart pub publish --dry-run` reports 0 warnings.
+- The package name and URLs come from `brand.json` (applied by
+  `scripts/brand.mjs`), so the brand switch is one command.
+- Tag `vX.Y.Z` → GitHub Actions runs analyze + tests and publishes via pub.dev
+  automated publishing (OIDC, no stored secret). See PUBLISHING.md.
+
 ## 0.3.0
 
 - **New:** `StraitLinks` client — full parity with the React Native SDK
