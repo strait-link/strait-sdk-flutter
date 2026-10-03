@@ -32,7 +32,7 @@ import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:play_install_referrer/play_install_referrer.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Persists the once-per-install flag.
+/// Persists the once-per-install flag and unsent open reports.
 class PrefsStore implements KeyValueStore {
   PrefsStore(this.prefs);
   final SharedPreferences prefs;
@@ -104,8 +104,32 @@ Notes:
 - Analytics: `strait.trackEvent('purchase', value: 49.99, currency: 'USD', linkId: e.linkId)`.
 - Fingerprint debug: `strait.reportFingerprint()` then `strait.compareFingerprint()`.
 - `strait.checkDeferred()` re-runs the deferred check (debugging); it doesn't
-  touch the once-per-install flag.
+  touch the once-per-install flag and never records an install.
 - `flutter_timezone` 4.x returns a `TimezoneInfo`; use `.identifier`.
+
+### What Strait records automatically (no extra code)
+
+Every time a link opens the app, the SDK reports it once (contract B14):
+
+| How the app opened | Reported via | Joined to |
+|---|---|---|
+| Verified link tapped in WhatsApp, Gmail, Messages… | `/v1/resolve` (the lookup is the report) | the link; also counted as a tap |
+| Browser handed off to the app (`yourapp://…`) | `/v1/open` | the exact tap (`strait_click`, removed before your app sees the URL) |
+| First open after a Play install | `/v1/referrer` | the exact tap that sent the user to the store |
+| First open after an App Store install | `/v1/match` | the matched tap |
+| Your own https links | `/v1/open` | host + path only (never the query) |
+
+Reports that can't be sent (offline, server busy) are saved in `storage`
+(key `strait.pendingOpens`, so pass a persistent `KeyValueStore`) and retried
+on the next `start()`, whenever the `lifecycle` stream reports `active`, and
+after any report that gets through, for up to 7 days (max 100). The engine
+de-duplicates by open id (`LinkEvent.id`), so nothing is counted twice.
+Navigation never waits for a report. The first launch of an install is marked
+as such, so dashboards can tell **new users** (installed and opened) from
+**existing users** (already had the app). The deferred check is only marked
+done once the server answered, so an offline first launch is retried on the
+next launch. Debugging: `await strait.pendingOpenReports()` (count waiting)
+and `await strait.flushOpenReports()` (send now).
 
 ### `LinkEvent`
 
@@ -146,13 +170,16 @@ if (result.matched && result.longUrl != null) { /* route */ }
 Implements every behaviour in
 [`shared-spec/SDK-CONTRACT.md`](../shared-spec/SDK-CONTRACT.md):
 B1 (publishableKey on every call) · B2 (`browserScreenWidth`) · B3 (short links
-→ `/v1/resolve`, engine reason reported) · B4 (`classifyUrl`) · B5
-(`AppStateTracker`) · B6 (once per install, skipped-but-marked on a link
-launch) · B7 (Install Referrer → `/v1/referrer`, else `/v1/match`) · B8 (iOS
-`/v1/match`) · B9 (one `LinkEvent` type, replay, `onLinkStart`) · B10 (never
-throws) · B11 (`jsonEncode`) · B12 (`splitUrl`, no `Uri` parsing) · B13
-(`trackEvent`, `reportFingerprint`, `compareFingerprint`). Both shared vector
-files are asserted in `dart test`.
+→ `/v1/resolve`, engine reason reported) · B4 (`classifyUrl`, tap id removed via
+`takeClickId`) · B5 (`AppStateTracker`) · B6 (once per install,
+skipped-but-marked on a link launch, marked only once the engine answered) ·
+B7 (Install Referrer → `/v1/referrer` with `parseStraitClick`, else
+`/v1/match`) · B8 (iOS `/v1/match`) · B9 (one `LinkEvent` type, replay,
+`onLinkStart`) · B10 (never throws) · B11 (`jsonEncode`) · B12 (`splitUrl`, no
+`Uri` parsing) · B13 (`trackEvent`, `reportFingerprint`, `compareFingerprint`)
+· B14 (every open reported once, `strait.pendingOpens` retry queue,
+`pendingOpenReports`, `flushOpenReports`). Both shared vector files (conformance
+v2) are asserted in `dart test`.
 
 ## How it matches
 
@@ -174,4 +201,4 @@ dart pub get && dart test
 `test/signature_test.dart` (signature) and `test/conformance_test.dart`
 (URL / referrer / app-state logic) enforce byte-for-byte parity with the other
 SDKs; `test/client_test.dart` covers the client scenarios with a fake engine and
-fake lifecycle.
+fake lifecycle; `test/opens_test.dart` covers open reporting (B14).

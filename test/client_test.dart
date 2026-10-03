@@ -301,7 +301,13 @@ void main() {
       expect(h.events.first.route, LinkRoute.fingerprint);
       expect(h.events.first.matched, isFalse);
       final body = h.engine.find('/v1/match')!.body!;
-      expect(body, {'publishableKey': pk, 'platform': 'android', ...device.toJson()});
+      expect(body, {
+        'publishableKey': pk,
+        'platform': 'android',
+        ...device.toJson(),
+        'openId': h.events.first.id,
+        'at': h.events.first.at,
+      });
     });
 
     test('referrer lookup misses → falls back to /v1/match', () async {

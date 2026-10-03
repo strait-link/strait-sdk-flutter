@@ -14,6 +14,10 @@ void main() {
     final c = v['constants'] as Map<String, dynamic>;
     expect(resumeWindowMs, c['RESUME_WINDOW_MS']);
     expect(transientPauseMs, c['TRANSIENT_PAUSE_MS']);
+    expect(openQueueMax, c['OPEN_QUEUE_MAX']);
+    expect(openQueueMaxAgeMs, c['OPEN_QUEUE_MAX_AGE_MS']);
+    expect(c.keys, unorderedEquals(
+        ['RESUME_WINDOW_MS', 'TRANSIENT_PAUSE_MS', 'OPEN_QUEUE_MAX', 'OPEN_QUEUE_MAX_AGE_MS']));
   });
 
   group('browserScreenWidth', () {
@@ -55,6 +59,41 @@ void main() {
     }
   });
 
+  group('parseStraitClick', () {
+    for (final c in v['referrerClick'] as List) {
+      test(jsonEncode(c['input']), () {
+        expect(parseStraitClick(c['input'] as String?), c['expected']);
+      });
+    }
+  });
+
+  group('takeClickId', () {
+    for (final c in v['takeClickId'] as List) {
+      test(c['input'], () {
+        final r = takeClickId(c['input'] as String);
+        expect({'url': r.url, 'clickId': r.clickId}, c['expected']);
+      });
+    }
+  });
+
+  group('pruneOpenQueue', () {
+    for (final c in v['openQueue'] as List) {
+      test(c['name'], () {
+        final queue = (c['queue'] as List).cast<Map<String, dynamic>>();
+        expect(pruneOpenQueue(queue, c['now'] as int).map((r) => r['openId']).toList(),
+            c['expected']);
+      });
+    }
+  });
+
+  group('shouldRetryReport', () {
+    for (final c in v['retry'] as List) {
+      test('${c['status']}', () {
+        expect(shouldRetryReport(c['status'] as int?), c['expected']);
+      });
+    }
+  });
+
   group('classifyUrl', () {
     for (final c in v['classify'] as List) {
       test(c['raw'], () {
@@ -64,7 +103,8 @@ void main() {
             : {
                 'route': r.route.value,
                 'needsResolve': r.needsResolve,
-                if (!r.needsResolve) ...{'url': r.url, 'path': r.path, 'params': r.params},
+                if (!r.needsResolve)
+                  ...{'url': r.url, 'path': r.path, 'params': r.params, 'clickId': r.clickId},
               };
         expect(got, c['expected']);
       });

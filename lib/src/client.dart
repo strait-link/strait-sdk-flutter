@@ -110,6 +110,7 @@ class LinkStart {
 }
 
 const _deferredFlag = 'strait.deferredChecked';
+const _queueKey = 'strait.pendingOpens';
 
 /// The Strait client: direct links (app_links), deferred links, analytics.
 ///
@@ -137,7 +138,6 @@ class StraitLinks {
   final _eventCtl = StreamController<LinkEvent>.broadcast();
   final _startCtl = StreamController<LinkStart>.broadcast();
   final _subs = <StreamSubscription<dynamic>>[];
-  int _seq = 0;
 
   StraitLinks({
     required this.publishableKey,
@@ -175,15 +175,19 @@ class StraitLinks {
   List<LinkEvent> get events => List.unmodifiable(_events);
 
   /// Handles the launch link, listens for new ones, runs the deferred check
-  /// once per install (B6). Wire [urls] to `AppLinks().uriLinkStream` and
-  /// [lifecycle] to a `WidgetsBindingObserver`. Never throws.
+  /// once per install (B6), and sends saved open reports (B14). Wire [urls]
+  /// to `AppLinks().uriLinkStream` and [lifecycle] to a
+  /// `WidgetsBindingObserver`. Never throws.
   Future<void> start({
     String? initialUrl,
     Stream<String>? urls,
     Stream<AppLifecycle>? lifecycle,
   }) async {
     if (lifecycle != null) {
-      _subs.add(lifecycle.listen((s) => _tracker.onState(s, _now()), onError: (_) {}));
+      _subs.add(lifecycle.listen((s) {
+        _tracker.onState(s, _now());
+        if (s == AppLifecycle.active) unawaited(flushOpenReports());
+      }, onError: (_) {}));
     }
     var skipEcho = initialUrl != null;
     if (urls != null) {
@@ -194,26 +198,39 @@ class StraitLinks {
         if (!echo) handleUrl(u);
       }, onError: (_) {}));
     }
-    if (initialUrl != null && initialUrl.isNotEmpty) {
-      await handleUrl(initialUrl, appState: AppStateAtLink.closed);
-    }
+    String? flag;
     try {
-      if (await _storage.get(_deferredFlag) != '1') {
-        await _storage.set(_deferredFlag, '1');
-        // Opened by a link on first launch = the user's intent right now.
-        if (initialUrl == null || initialUrl.isEmpty) await checkDeferred();
-      }
-    } catch (_) {
-      // Storage failure: skip the deferred check rather than risk re-routing every launch.
+      flag = await _storage.get(_deferredFlag);
+    } catch (_) {}
+    final firstLaunch = flag != '1';
+    if (initialUrl != null && initialUrl.isNotEmpty) {
+      // Opened by a link on first launch = the user's intent right now: no
+      // deferred check, but this open still counts as the install's first.
+      if (firstLaunch) await _setFlag();
+      await _handleUrl(initialUrl, AppStateAtLink.closed, firstLaunch);
+    } else if (firstLaunch) {
+      // Marked done only once the engine answered: offline → next launch.
+      final e = await _runDeferred(true);
+      if (e.reason != 'network') await _setFlag();
     }
+    unawaited(flushOpenReports());
+  }
+
+  Future<void> _setFlag() async {
+    try {
+      await _storage.set(_deferredFlag, '1');
+    } catch (_) {}
   }
 
   /// Resolve one URL handed to the app. [appState] defaults to the tracker's
-  /// label (background / foreground). Never throws (B10).
-  Future<LinkEvent> handleUrl(String raw, {AppStateAtLink? appState}) async {
+  /// label (background / foreground). Reports the open (B14). Never throws (B10).
+  Future<LinkEvent> handleUrl(String raw, {AppStateAtLink? appState}) =>
+      _handleUrl(raw, appState, false);
+
+  Future<LinkEvent> _handleUrl(String raw, AppStateAtLink? appState, bool firstLaunch) async {
     final t0 = _now();
     final state = appState ?? _tracker.classify(t0);
-    final id = _newId(t0);
+    final id = newOpenId(t0);
     _announce(LinkStart(id: id, kind: LinkKind.direct, appState: state, rawUrl: raw, at: t0));
     final c = classifyUrl(raw, _linkHosts);
     if (c == null) {
@@ -223,28 +240,55 @@ class StraitLinks {
       ));
     }
     if (c.needsResolve) {
+      // The lookup is also the open report (openId); the engine says whether
+      // it recorded it, and anything short of that is retried via /v1/open.
+      final base = <String, dynamic>{
+        'openId': id, 'kind': 'direct', 'route': 'app_link', 'appState': state.name,
+        'platform': platform, 'url': raw, 'matched': false, 'firstLaunch': firstLaunch, 'at': t0,
+      };
       try {
         final r = await _call('POST', '/v1/resolve', {
           'publishableKey': publishableKey,
           'url': raw,
           'platform': platform,
+          'openId': id,
+          'appState': state.name,
+          'firstLaunch': firstLaunch,
+          'at': t0,
         });
         final matched = r.json['matched'] == true;
+        final reason = matched ? null : (_str(r.json['reason']) ?? _str(r.json['error']));
+        final linkId = _str(r.json['linkId']);
+        if (r.json['recorded'] != true) {
+          unawaited(_report({
+            ...base,
+            'matched': matched,
+            if (reason != null) 'reason': reason,
+            if (linkId != null) 'linkId': linkId,
+          }));
+        }
         final dest = _destination(matched ? _str(r.json['longUrl']) : null);
         return _emit(LinkEvent(
           id: id, kind: LinkKind.direct, route: LinkRoute.appLink, appState: state,
-          rawUrl: raw, matched: matched,
-          reason: matched ? null : (_str(r.json['reason']) ?? _str(r.json['error'])),
+          rawUrl: raw, matched: matched, reason: reason,
           url: dest.url, path: dest.path, params: dest.params,
-          linkId: _str(r.json['linkId']), ms: _now() - t0, at: t0,
+          linkId: linkId, ms: _now() - t0, at: t0,
         ));
       } catch (_) {
+        unawaited(_enqueue({...base, 'reason': 'network'}));
         return _emit(LinkEvent(
           id: id, kind: LinkKind.direct, route: LinkRoute.appLink, appState: state,
           rawUrl: raw, matched: false, reason: 'network', ms: _now() - t0, at: t0,
         ));
       }
     }
+    // Navigation never waits for the report.
+    unawaited(_report({
+      'openId': id, 'kind': 'direct', 'route': c.route.value, 'appState': state.name,
+      'platform': platform, 'url': c.url,
+      if (c.clickId != null) 'clickId': c.clickId,
+      'matched': true, 'firstLaunch': firstLaunch, 'at': t0,
+    }));
     return _emit(LinkEvent(
       id: id, kind: LinkKind.direct, route: c.route, appState: state, rawUrl: raw,
       matched: true, url: c.url, path: c.path, params: c.params, ms: _now() - t0, at: t0,
@@ -252,11 +296,24 @@ class StraitLinks {
   }
 
   /// Run the deferred check now (B7, B8). Doesn't touch the once-per-install
-  /// flag, so it's safe for debugging. Never throws.
-  Future<LinkEvent> checkDeferred() async {
+  /// flag and sends no openId (never adds an install), so it's safe for
+  /// debugging. Never throws.
+  Future<LinkEvent> checkDeferred() => _runDeferred(false);
+
+  /// The deferred check. [record] (the once-per-install run) sends the openId
+  /// so the engine records this first open + install exactly once.
+  Future<LinkEvent> _runDeferred(bool record) async {
     final t0 = _now();
-    final id = _newId(t0);
+    final id = newOpenId(t0);
+    final tag = record ? {'openId': id, 'at': t0} : const <String, Object>{};
     _announce(LinkStart(id: id, kind: LinkKind.deferred, appState: AppStateAtLink.closed, at: t0));
+    // No answer, 429 or 5xx = try again next launch (reported as 'network').
+    Future<_Res> answered(String path, Map<String, dynamic> body) async {
+      final r = await _call('POST', path, body);
+      if (shouldRetryReport(r.status)) throw StateError('HTTP ${r.status}');
+      return r;
+    }
+
     try {
       if (platform == 'android') {
         String? referrer;
@@ -265,10 +322,13 @@ class StraitLinks {
         } catch (_) {}
         final linkId = parseStraitLink(referrer);
         if (linkId != null) {
-          final r = await _call('POST', '/v1/referrer', {
+          final clickId = parseStraitClick(referrer);
+          final r = await answered('/v1/referrer', {
             'publishableKey': publishableKey,
             'linkId': linkId,
+            if (clickId != null) 'clickId': clickId,
             'platform': 'android',
+            ...tag,
           });
           if (r.json['matched'] == true) {
             final dest = _destination(_str(r.json['longUrl']));
@@ -281,10 +341,11 @@ class StraitLinks {
           }
         }
       }
-      final r = await _call('POST', '/v1/match', {
+      final r = await answered('/v1/match', {
         'publishableKey': publishableKey,
         'platform': platform,
         ..._device().toJson(),
+        ...tag,
       });
       final matched = r.json['matched'] == true;
       final dest = _destination(matched ? _str(r.json['longUrl']) : null);
@@ -303,6 +364,78 @@ class StraitLinks {
       ));
     }
   }
+
+  // ── Open reports (B14): every open is reported once; failures are saved in
+  // storage and retried. Queue operations run one at a time (storage is async).
+  Future<void> _queueOp = Future<void>.value();
+  Future<void>? _flushing;
+
+  Future<T> _serial<T>(Future<T> Function() fn) {
+    final p = _queueOp.then((_) => fn());
+    _queueOp = p.then((_) {}, onError: (_) {});
+    return p;
+  }
+
+  Future<List<Map<String, dynamic>>> _readQueue() async {
+    try {
+      final v = jsonDecode(await _storage.get(_queueKey) ?? '[]');
+      return v is List ? v.whereType<Map<String, dynamic>>().toList() : [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<void> _writeQueue(List<Map<String, dynamic>> q) async {
+    try {
+      await _storage.set(_queueKey, jsonEncode(q));
+    } catch (_) {}
+  }
+
+  Future<void> _enqueue(Map<String, dynamic> report) => _serial(() async {
+        await _writeQueue(pruneOpenQueue([...await _readQueue(), report], _now()));
+      });
+
+  /// POST /v1/open; the HTTP status, or null when there was no answer.
+  Future<int?> _sendReport(Map<String, dynamic> report) async {
+    try {
+      return (await _call('POST', '/v1/open', {'publishableKey': publishableKey, ...report}))
+          .status;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Report an open now; keep it for retry if it doesn't get through.
+  Future<void> _report(Map<String, dynamic> report) async {
+    final status = await _sendReport(report);
+    if (shouldRetryReport(status)) {
+      await _enqueue(report);
+    } else {
+      unawaited(flushOpenReports()); // the network works: send anything saved earlier
+    }
+  }
+
+  /// Open reports saved while offline, waiting to be sent (debugging).
+  Future<int> pendingOpenReports() => _serial(() async => (await _readQueue()).length);
+
+  /// Send saved open reports now (also happens on start and on resume).
+  /// Never throws.
+  Future<void> flushOpenReports() => _flushing ??= _serial(() async {
+        final queue = pruneOpenQueue(await _readQueue(), _now());
+        final keep = <Map<String, dynamic>>[];
+        var offline = false;
+        for (final rep in queue) {
+          // Once one gets no answer at all, keep the rest for later.
+          if (offline) {
+            keep.add(rep);
+            continue;
+          }
+          final status = await _sendReport(rep);
+          offline = status == null;
+          if (shouldRetryReport(status)) keep.add(rep);
+        }
+        await _writeQueue(keep);
+      }).whenComplete(() => _flushing = null);
 
   /// Send this app's fingerprint to the engine (debug comparison with the
   /// browser). Returns the engine's JSON, or null on network failure.
@@ -362,8 +495,6 @@ class StraitLinks {
     await _startCtl.close();
   }
 
-  String _newId(int at) => 'evt_${at}_${++_seq}';
-
   void _announce(LinkStart s) {
     if (!_startCtl.isClosed) _startCtl.add(s);
   }
@@ -387,14 +518,15 @@ class StraitLinks {
     } catch (_) {
       json = <String, dynamic>{};
     }
-    return _Res(res.statusCode >= 200 && res.statusCode < 300, json);
+    return _Res(res.statusCode >= 200 && res.statusCode < 300, res.statusCode, json);
   }
 }
 
 class _Res {
   final bool ok;
+  final int status;
   final Map<String, dynamic> json;
-  const _Res(this.ok, this.json);
+  const _Res(this.ok, this.status, this.json);
 }
 
 class _Dest {

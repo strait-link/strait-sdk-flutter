@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.4.0
+
+- **New (contract B14):** every link open is reported exactly once. Each open
+  gets an id from `newOpenId` (`o_<base36 ms>_<12 chars>`), also used as the
+  `LinkEvent.id`. Short links send `openId`, `appState`, `firstLaunch`, `at`
+  with `/v1/resolve` (falling back to `/v1/open` when the engine didn't record
+  it); custom-scheme hand-offs and your own https links are reported via
+  `POST /v1/open` without delaying the event. Unsent reports are kept in
+  `storage` under `strait.pendingOpens` and retried on start, on resume and
+  after any successful report (≤7 days, ≤100). New `pendingOpenReports()` and
+  `flushOpenReports()`.
+- **New (B4):** a `strait_click` tap id is removed from the destination
+  (`takeClickId`) and returned as `ClassifiedUrl.clickId`.
+- **Changed (B6/B7/B8):** the deferred check is marked done only once the
+  engine answered (no answer / 429 / 5xx → `reason: 'network'`, retried next
+  launch). The once-per-install run sends `openId` + `at` on `/v1/referrer`
+  and `/v1/match`, plus the tap id (`parseStraitClick`) on `/v1/referrer`;
+  `checkDeferred()` sends neither.
+- **New pure helpers:** `parseStraitClick`, `takeClickId`, `pruneOpenQueue`,
+  `shouldRetryReport`, `newOpenId`, `openQueueMax`, `openQueueMaxAgeMs` —
+  checked against conformance vectors v2.
+
 ## 0.3.0
 
 - **New:** `StraitLinks` client — full parity with the React Native SDK
