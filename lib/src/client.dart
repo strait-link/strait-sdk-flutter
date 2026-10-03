@@ -198,10 +198,14 @@ class StraitLinks {
         if (!echo) handleUrl(u);
       }, onError: (_) {}));
     }
+    // Unreadable storage counts as "already checked": never risk a stale
+    // deferred jump on every launch. Write failures are ignored (never throw).
     String? flag;
     try {
       flag = await _storage.get(_deferredFlag);
-    } catch (_) {}
+    } catch (_) {
+      flag = '1';
+    }
     final firstLaunch = flag != '1';
     if (initialUrl != null && initialUrl.isNotEmpty) {
       // Opened by a link on first launch = the user's intent right now: no

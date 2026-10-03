@@ -116,6 +116,16 @@ const resolved = Reply(200, resolvedBody);
 const accepted = Reply(202, {'ok': true, 'duplicate': false});
 const noMatch = Reply(200, {'matched': false, 'matchMethod': 'none'});
 
+/// Storage whose writes (and optionally reads) fail.
+class BrokenStore implements KeyValueStore {
+  final bool failGet;
+  BrokenStore({this.failGet = false});
+  @override
+  Future<String?> get(String key) async => failGet ? throw StateError('io') : null;
+  @override
+  Future<void> set(String key, String value) async => throw StateError('full');
+}
+
 /// Not the first launch.
 MemoryStore returning() => MemoryStore()..data['strait.deferredChecked'] = '1';
 
@@ -386,6 +396,27 @@ void main() {
       expect(engine.of('/v1/match'), hasLength(1));
       expect(engine.of('/v1/match')[0].body!.containsKey('openId'), isFalse);
       expect(engine.of('/v1/match')[0].body!.containsKey('at'), isFalse);
+    });
+
+    test('unreadable storage = already checked (no deferred jump); write failures never throw',
+        () async {
+      StraitLinks strait(FakeEngine engine, KeyValueStore store) => StraitLinks(
+            publishableKey: pk,
+            endpoint: endpoint,
+            platform: 'android',
+            deviceFields: () => device,
+            storage: store,
+            client: engine.client,
+            now: () => 1800000000000,
+          );
+      final engine = FakeEngine({'/v1/match': noMatch, '/v1/resolve': resolved});
+      await strait(engine, BrokenStore(failGet: true)).start();
+      expect(engine.of('/v1/match'), isEmpty);
+      final e2 = FakeEngine({'/v1/match': noMatch});
+      await expectLater(strait(e2, BrokenStore()).start(), completes);
+      final e3 = FakeEngine({'/v1/resolve': resolved});
+      await expectLater(
+          strait(e3, BrokenStore()).start(initialUrl: 'https://links.test/sale'), completes);
     });
   });
 
