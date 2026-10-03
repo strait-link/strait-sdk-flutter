@@ -56,9 +56,9 @@ class MatchResult {
 /// Resolve the deferred deep link this device clicked before installing.
 ///   • Android with a `strait_link` install referrer → /v1/referrer (exact).
 ///   • otherwise → /v1/match (fingerprint).
-/// [publishableKey] is your workspace publishable key (`bk_pub_live_…` or
-/// `bk_pub_test_…`) from Dashboard → Get started. It is safe to ship in apps;
-/// never pass your secret key (`bk_live_…`).
+/// [publishableKey] is your workspace publishable key (`st_pub_live_…` or
+/// `st_pub_test_…`) from Dashboard → Get started. It is safe to ship in apps;
+/// never pass your secret key (`st_live_…`).
 /// Never throws; returns [MatchResult.none] on any error.
 Future<MatchResult> resolveDeferredLink({
   required String publishableKey,

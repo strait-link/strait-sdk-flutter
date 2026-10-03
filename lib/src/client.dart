@@ -118,7 +118,7 @@ const _queueKey = 'strait.pendingOpens';
 /// launch URL, a stream of later URLs and a stream of lifecycle states (see
 /// README), so all logic is tested without Flutter.
 class StraitLinks {
-  /// Workspace publishable key (`bk_pub_live_…`), Dashboard → Get started.
+  /// Workspace publishable key (`st_pub_live_…`), Dashboard → Get started.
   final String publishableKey;
 
   /// 'ios' | 'android' | 'other'.

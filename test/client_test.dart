@@ -6,7 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:test/test.dart';
 
-const pk = 'bk_pub_test_appowner01';
+const pk = 'st_pub_test_appowner01';
 const endpoint = 'https://links.test';
 const device = DeviceFields(
     screenWidth: 411, pixelRatio: 2.625, language: 'en', timezone: 'Asia/Kolkata');

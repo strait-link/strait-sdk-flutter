@@ -69,7 +69,7 @@ Future<StraitLinks> startStrait() async {
   WidgetsFlutterBinding.ensureInitialized();
   final timezone = await FlutterTimezone.getLocalTimezone(); // IANA, e.g. Asia/Kolkata
   final strait = StraitLinks(
-    publishableKey: 'bk_pub_live_…', // Dashboard → Get started
+    publishableKey: 'st_pub_live_…', // Dashboard → Get started
     endpoint: 'https://go.yourbrand.com',
     linkHosts: const ['links.yourbrand.com'], // extra custom domains, if any
     platform: Platform.isIOS ? 'ios' : Platform.isAndroid ? 'android' : 'other',
@@ -159,7 +159,7 @@ Still supported for apps that only want the deferred match:
 
 ```dart
 final result = await resolveDeferredLink(
-  publishableKey: 'bk_pub_live_…',
+  publishableKey: 'st_pub_live_…',
   endpoint: 'https://go.yourbrand.com',
   platform: Platform.isIOS ? 'ios' : 'android',
   device: device, // DeviceFields as above
@@ -168,8 +168,8 @@ final result = await resolveDeferredLink(
 if (result.matched && result.longUrl != null) { /* route */ }
 ```
 
-> **Publishable key:** Dashboard → Get started → Publishable key (`bk_pub_live_…`).
-> It's safe to include in your app. Never put your secret key (`bk_live_…`) in an app.
+> **Publishable key:** Dashboard → Get started → Publishable key (`st_pub_live_…`).
+> It's safe to include in your app. Never put your secret key (`st_live_…`) in an app.
 
 > **Timezone:** the signature needs the IANA name (e.g. `Asia/Kolkata`). Get it
 > from a plugin like `flutter_timezone`; `DateTime.timeZoneName` is an

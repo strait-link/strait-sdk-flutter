@@ -6,7 +6,7 @@ The package name (`<slug>_sdk`), homepage, repository and copyright holder come 
 
 ## One-time owner setup
 
-1. **Pick the brand.** From `strait/`: `shared-spec/scripts/rename-brand.sh … --final --apply`
+1. **Pick the brand.** From the workspace root (the folder holding every SDK repo): `shared-spec/scripts/rename-brand.sh … --final --apply`
    (or edit `brand.json`, set `"final": true`, run `node scripts/brand.mjs --write`).
    Commit. Check the name is free: `https://pub.dev/packages/<name>`.
 2. **Make the GitHub repo public.**

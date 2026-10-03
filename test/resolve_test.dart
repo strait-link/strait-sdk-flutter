@@ -4,7 +4,7 @@ import 'package:http/testing.dart';
 import 'package:test/test.dart';
 import 'package:strait_sdk/src/strait.dart';
 
-const key = 'bk_pub_test_0123456789abcdef0123456789abcdef';
+const key = 'st_pub_test_0123456789abcdef0123456789abcdef';
 
 const device = DeviceFields(
   screenWidth: 393,
