@@ -16,8 +16,20 @@ void main() {
     expect(transientPauseMs, c['TRANSIENT_PAUSE_MS']);
     expect(openQueueMax, c['OPEN_QUEUE_MAX']);
     expect(openQueueMaxAgeMs, c['OPEN_QUEUE_MAX_AGE_MS']);
-    expect(c.keys, unorderedEquals(
-        ['RESUME_WINDOW_MS', 'TRANSIENT_PAUSE_MS', 'OPEN_QUEUE_MAX', 'OPEN_QUEUE_MAX_AGE_MS']));
+    expect(attributionWindowMs, c['ATTRIBUTION_WINDOW_MS']);
+    expect(c.keys, unorderedEquals([
+      'RESUME_WINDOW_MS', 'TRANSIENT_PAUSE_MS', 'OPEN_QUEUE_MAX', 'OPEN_QUEUE_MAX_AGE_MS',
+      'ATTRIBUTION_WINDOW_MS'
+    ]));
+  });
+
+  group('eventClickId (B15)', () {
+    for (final c in v['eventClickId'] as List) {
+      test('${c['name']}', () {
+        expect(eventClickId(c['stored'] as String?, c['now'] as int, c['explicit'] as String?),
+            c['expected']);
+      });
+    }
   });
 
   group('browserScreenWidth', () {

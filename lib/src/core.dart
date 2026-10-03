@@ -3,6 +3,7 @@
 /// cross-language contract (see `shared-spec/SDK-CONTRACT.md`).
 library;
 
+import 'dart:convert' show jsonDecode, jsonEncode;
 import 'dart:math' show Random;
 
 /// How the app received a link.
@@ -206,6 +207,37 @@ const openQueueMax = 100;
 List<Map<String, dynamic>> pruneOpenQueue(List<Map<String, dynamic>> queue, int now) {
   final fresh = queue.where((r) => now - (r['at'] as num) <= openQueueMaxAgeMs).toList();
   return fresh.length > openQueueMax ? fresh.sublist(fresh.length - openQueueMax) : fresh;
+}
+
+/// Conversion events carry the tap id of the most recent attributed link
+/// open for this long (contract B15).
+const attributionWindowMs = 7 * 24 * 60 * 60 * 1000;
+
+/// Storage value for the remembered tap (key `strait.lastTap`):
+/// `{"clickId":…,"at":<epoch ms>}`.
+String rememberTap(String clickId, int at) =>
+    jsonEncode({'clickId': clickId.toLowerCase(), 'at': at});
+
+/// The `clickId` a conversion event sends (contract B15): a non-empty
+/// [explicit] wins; otherwise the remembered tap ([stored], see [rememberTap])
+/// when it is a valid tap id opened at most [attributionWindowMs] before
+/// [now] (and not after it). Anything unreadable means no tap.
+String? eventClickId(String? stored, int now, [String? explicit]) {
+  if (explicit != null && explicit.isNotEmpty) return explicit;
+  if (stored == null || stored.isEmpty) return null;
+  Object? tap;
+  try {
+    tap = jsonDecode(stored);
+  } catch (_) {
+    return null;
+  }
+  if (tap is! Map) return null;
+  final clickId = tap['clickId'];
+  final at = tap['at'];
+  if (clickId is! String || !_clickIdRe.hasMatch(clickId)) return null;
+  if (at is! num || !at.isFinite) return null;
+  final age = now - at;
+  return age >= 0 && age <= attributionWindowMs ? clickId.toLowerCase() : null;
 }
 
 /// Whether a failed report should be kept for retry: no answer, 429 or 5xx.

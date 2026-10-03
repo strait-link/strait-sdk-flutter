@@ -111,6 +111,7 @@ class LinkStart {
 
 const _deferredFlag = 'strait.deferredChecked';
 const _queueKey = 'strait.pendingOpens';
+const _tapKey = 'strait.lastTap';
 
 /// The Strait client: direct links (app_links), deferred links, analytics.
 ///
@@ -263,6 +264,7 @@ class StraitLinks {
         final matched = r.json['matched'] == true;
         final reason = matched ? null : (_str(r.json['reason']) ?? _str(r.json['error']));
         final linkId = _str(r.json['linkId']);
+        if (matched) _noteTap(null, t0);
         if (r.json['recorded'] != true) {
           unawaited(_report({
             ...base,
@@ -286,6 +288,7 @@ class StraitLinks {
         ));
       }
     }
+    if (c.clickId != null) _noteTap(c.clickId, t0);
     // Navigation never waits for the report.
     unawaited(_report({
       'openId': id, 'kind': 'direct', 'route': c.route.value, 'appState': state.name,
@@ -335,6 +338,7 @@ class StraitLinks {
             ...tag,
           });
           if (r.json['matched'] == true) {
+            if (record) _noteTap(clickId, t0);
             final dest = _destination(_str(r.json['longUrl']));
             return _emit(LinkEvent(
               id: id, kind: LinkKind.deferred, route: LinkRoute.installReferrer,
@@ -352,6 +356,7 @@ class StraitLinks {
         ...tag,
       });
       final matched = r.json['matched'] == true;
+      if (record && matched) _noteTap(null, t0);
       final dest = _destination(matched ? _str(r.json['longUrl']) : null);
       return _emit(LinkEvent(
         id: id, kind: LinkKind.deferred, route: LinkRoute.fingerprint,
@@ -367,6 +372,17 @@ class StraitLinks {
         ms: _now() - t0, at: t0,
       ));
     }
+  }
+
+  // ── Remembered tap (B15): the tap id of the last attributed link open, sent
+  // with conversion events. An attributed open without a known tap id (short
+  // link, fingerprint match) forgets it: the newer touch wins. Writes are
+  // chained so a trackEvent right after an open sees it; failures are ignored.
+  Future<void> _tapWrite = Future<void>.value();
+
+  void _noteTap(String? clickId, int at) {
+    final value = clickId != null ? rememberTap(clickId, at) : '';
+    _tapWrite = _tapWrite.then((_) => _storage.set(_tapKey, value)).catchError((_) {});
   }
 
   // ── Open reports (B14): every open is reported once; failures are saved in
@@ -468,8 +484,17 @@ class StraitLinks {
   }
 
   /// Conversion / revenue event. Resolves true when accepted. Never throws.
-  Future<bool> trackEvent(String name, {num? value, String? currency, String? linkId}) async {
+  /// Carries the tap id of the last attributed link open (≤7 days, contract
+  /// B15) unless you pass [clickId] yourself.
+  Future<bool> trackEvent(String name,
+      {num? value, String? currency, String? linkId, String? clickId}) async {
     try {
+      await _tapWrite;
+      String? stored;
+      try {
+        stored = await _storage.get(_tapKey);
+      } catch (_) {}
+      final tap = eventClickId(stored, _now(), clickId);
       return (await _call('POST', '/v1/event', {
         'publishableKey': publishableKey,
         'event': name,
@@ -477,6 +502,7 @@ class StraitLinks {
         if (value != null) 'value': value,
         if (currency != null) 'currency': currency,
         if (linkId != null) 'linkId': linkId,
+        if (tap != null) 'clickId': tap,
       })).ok;
     } catch (_) {
       return false;

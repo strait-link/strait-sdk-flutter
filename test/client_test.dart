@@ -375,4 +375,79 @@ void main() {
       });
     });
   });
+
+  group('conversion events carry the tap id (B15)', () {
+    const tap = '3f2a9c1e-7b4d-4e8a-9c0f-1a2b3c4d5e6f';
+    const other = '11111111-2222-4333-8444-555555555555';
+    const day = 24 * 60 * 60 * 1000;
+    Map<String, dynamic>? eventBody(FakeEngine e) =>
+        e.calls.where((c) => c.path == '/v1/event').lastOrNull?.body;
+
+    test('a browser hand-off tap is remembered and attached to a purchase', () async {
+      final store = MemoryStore();
+      final h = make(FakeEngine({'/v1/event': {'ok': true}, '/v1/open': {'ok': true}}), storage: store);
+      await h.start(initialUrl: 'straitlink://shop.example/p/42?strait_click=$tap');
+      h.phone.advance(day);
+      await h.strait.trackEvent('purchase', value: 5, currency: 'USD');
+      expect(eventBody(h.engine)!['clickId'], tap);
+      expect(jsonDecode(store.data['strait.lastTap']!), {'clickId': tap, 'at': 1000000});
+    });
+
+    test('not after 7 days', () async {
+      final h = make(FakeEngine({'/v1/event': {'ok': true}, '/v1/open': {'ok': true}}));
+      await h.start(initialUrl: 'straitlink://shop.example/p/42?strait_click=$tap');
+      h.phone.advance(7 * day + 1);
+      await h.strait.trackEvent('purchase');
+      expect(eventBody(h.engine)!.containsKey('clickId'), isFalse);
+    });
+
+    test('an explicit clickId overrides the remembered tap', () async {
+      final h = make(FakeEngine({'/v1/event': {'ok': true}, '/v1/open': {'ok': true}}));
+      await h.start(initialUrl: 'straitlink://shop.example/p/42?strait_click=$tap');
+      await h.strait.trackEvent('purchase', clickId: other);
+      expect(eventBody(h.engine)!['clickId'], other);
+    });
+
+    test('no remembered tap: no clickId', () async {
+      final h = make(FakeEngine({'/v1/event': {'ok': true}, '/v1/match': {'matched': false}}));
+      await h.start();
+      await h.strait.trackEvent('signup');
+      expect(eventBody(h.engine)!.containsKey('clickId'), isFalse);
+    });
+
+    test('the Play referrer tap is remembered on a deferred install', () async {
+      final h = make(
+          FakeEngine({
+            '/v1/event': {'ok': true},
+            '/v1/referrer': {'matched': true, 'longUrl': 'https://shop.example/p/7', 'linkId': 'lnk_7'}
+          }),
+          referrer: 'strait_link=lnk_7&strait_click=$tap');
+      await h.start();
+      await h.strait.trackEvent('purchase');
+      expect(eventBody(h.engine)!['clickId'], tap);
+    });
+
+    test('a newer short-link open (tap id unknown) forgets the older tap', () async {
+      final h = make(FakeEngine({...resolved, '/v1/event': {'ok': true}, '/v1/open': {'ok': true}}));
+      await h.start(initialUrl: 'straitlink://shop.example/p/42?strait_click=$tap');
+      await h.strait.handleUrl('https://links.test/sale');
+      await h.strait.trackEvent('purchase');
+      expect(eventBody(h.engine)!.containsKey('clickId'), isFalse);
+    });
+
+    test('unreadable storage never blocks the event', () async {
+      final h = make(FakeEngine({'/v1/event': {'ok': true}, '/v1/open': {'ok': true}}),
+          storage: _BrokenStore());
+      await h.start(initialUrl: 'straitlink://x.example/?strait_click=$tap');
+      expect(await h.strait.trackEvent('purchase'), isTrue);
+      expect(eventBody(h.engine)!.containsKey('clickId'), isFalse);
+    });
+  });
+}
+
+class _BrokenStore implements KeyValueStore {
+  @override
+  Future<String?> get(String key) async => throw StateError('io');
+  @override
+  Future<void> set(String key, String value) async => throw StateError('io');
 }
