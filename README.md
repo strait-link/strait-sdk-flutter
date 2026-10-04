@@ -112,11 +112,11 @@ Notes:
 - `app_links` 6+ also emits the launch link on `uriLinkStream`; `start()`
   ignores that first echo, so the launch link is handled once.
 - Analytics: `strait.trackEvent('purchase', value: 49.99, currency: 'USD', linkId: e.linkId)`.
-  The event carries the tap id of the last link open that had one (browser
-  hand-off or Play install) for 7 days, so the dashboard can place revenue on
-  that tap's channel and A/B variant (B15). A newer verified short-link open
-  replaces it (its tap id isn't known to the app, so the event then carries
-  none). Pass `clickId:` to set it yourself.
+  The event carries the tap id of the last attributed link open for 7 days, so
+  the dashboard can place revenue on that tap's channel and A/B variant
+  (B15/B16). Every attributed open supplies one: a browser hand-off, a Play
+  install, or the engine's reply to a verified short link or a deferred match.
+  A newer open replaces the older tap. Pass `clickId:` to set it yourself.
 - Fingerprint debug: `strait.reportFingerprint()` then `strait.compareFingerprint()`.
 - `strait.checkDeferred()` re-runs the deferred check (debugging); it doesn't
   touch the once-per-install flag and never records an install.
@@ -194,8 +194,9 @@ B7 (Install Referrer → `/v1/referrer` with `parseStraitClick`, else
 `Uri` parsing) · B13 (`trackEvent`, `reportFingerprint`, `compareFingerprint`)
 · B14 (every open reported once, `strait.pendingOpens` retry queue,
 `pendingOpenReports`, `flushOpenReports`) · B15 (events carry the remembered
-tap id, `strait.lastTap`, `eventClickId`). Both shared vector files (conformance
-v3) are asserted in `dart test`.
+tap id, `strait.lastTap`, `eventClickId`) · B16 (the tap id from the
+`/v1/resolve`, `/v1/match` and `/v1/referrer` replies, `replyClickId`). Both
+shared vector files (conformance v4) are asserted in `dart test`.
 
 ## How it matches
 

@@ -376,7 +376,7 @@ void main() {
     });
   });
 
-  group('conversion events carry the tap id (B15)', () {
+  group('conversion events carry the tap id (B15/B16)', () {
     const tap = '3f2a9c1e-7b4d-4e8a-9c0f-1a2b3c4d5e6f';
     const other = '11111111-2222-4333-8444-555555555555';
     const day = 24 * 60 * 60 * 1000;
@@ -427,8 +427,59 @@ void main() {
       expect(eventBody(h.engine)!['clickId'], tap);
     });
 
-    test('a newer short-link open (tap id unknown) forgets the older tap', () async {
+    test('a newer short-link open with no tap id in the reply (older engine) forgets the older tap', () async {
       final h = make(FakeEngine({...resolved, '/v1/event': {'ok': true}, '/v1/open': {'ok': true}}));
+      await h.start(initialUrl: 'straitlink://shop.example/p/42?strait_click=$tap');
+      await h.strait.handleUrl('https://links.test/sale');
+      await h.strait.trackEvent('purchase');
+      expect(eventBody(h.engine)!.containsKey('clickId'), isFalse);
+    });
+
+    test('B16: a short-link open remembers the tap id the engine returns, replacing the older tap', () async {
+      final store = MemoryStore();
+      final h = make(
+          FakeEngine({
+            '/v1/resolve': {...resolved['/v1/resolve']!, 'recorded': true, 'clickId': tap.toUpperCase()},
+            '/v1/event': {'ok': true},
+            '/v1/open': {'ok': true},
+          }),
+          storage: store);
+      await h.start(initialUrl: 'straitlink://shop.example/p/42?strait_click=$other');
+      h.phone.advance(1000);
+      await h.strait.handleUrl('https://links.test/sale');
+      await h.strait.trackEvent('purchase');
+      expect(eventBody(h.engine)!['clickId'], tap);
+      expect(jsonDecode(store.data['strait.lastTap']!), {'clickId': tap, 'at': 1001000});
+    });
+
+    test('B16: a fingerprint match remembers the tap id the engine returns', () async {
+      final h = make(FakeEngine({
+        '/v1/event': {'ok': true},
+        '/v1/match': {'matched': true, 'longUrl': 'https://shop.example/p/9', 'linkId': 'lnk_9', 'clickId': tap},
+      }));
+      await h.start();
+      await h.strait.trackEvent('purchase');
+      expect(eventBody(h.engine)!['clickId'], tap);
+    });
+
+    test("B16: the referrer reply's tap id wins over the parsed one", () async {
+      final h = make(
+          FakeEngine({
+            '/v1/event': {'ok': true},
+            '/v1/referrer': {'matched': true, 'longUrl': 'https://shop.example/p/7', 'linkId': 'lnk_7', 'clickId': tap}
+          }),
+          referrer: 'strait_link=lnk_7&strait_click=$other');
+      await h.start();
+      await h.strait.trackEvent('purchase');
+      expect(eventBody(h.engine)!['clickId'], tap);
+    });
+
+    test('B16: a malformed reply tap id counts as none (forgets)', () async {
+      final h = make(FakeEngine({
+        '/v1/resolve': {...resolved['/v1/resolve']!, 'clickId': 'nope'},
+        '/v1/event': {'ok': true},
+        '/v1/open': {'ok': true},
+      }));
       await h.start(initialUrl: 'straitlink://shop.example/p/42?strait_click=$tap');
       await h.strait.handleUrl('https://links.test/sale');
       await h.strait.trackEvent('purchase');

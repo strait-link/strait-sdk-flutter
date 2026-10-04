@@ -32,6 +32,14 @@ void main() {
     }
   });
 
+  group('replyClickId (B16)', () {
+    for (final c in v['replyClickId'] as List) {
+      test('${c['name']}', () {
+        expect(replyClickId(c['reply'], c['fallback'] as String?), c['expected']);
+      });
+    }
+  });
+
   group('browserScreenWidth', () {
     for (final c in v['screenWidth'] as List) {
       test('${c['logical']}', () {

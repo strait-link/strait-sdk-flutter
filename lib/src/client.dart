@@ -264,7 +264,7 @@ class StraitLinks {
         final matched = r.json['matched'] == true;
         final reason = matched ? null : (_str(r.json['reason']) ?? _str(r.json['error']));
         final linkId = _str(r.json['linkId']);
-        if (matched) _noteTap(null, t0);
+        if (matched) _noteTap(replyClickId(r.json['clickId']), t0);
         if (r.json['recorded'] != true) {
           unawaited(_report({
             ...base,
@@ -338,7 +338,7 @@ class StraitLinks {
             ...tag,
           });
           if (r.json['matched'] == true) {
-            if (record) _noteTap(clickId, t0);
+            if (record) _noteTap(replyClickId(r.json['clickId'], clickId), t0);
             final dest = _destination(_str(r.json['longUrl']));
             return _emit(LinkEvent(
               id: id, kind: LinkKind.deferred, route: LinkRoute.installReferrer,
@@ -356,7 +356,7 @@ class StraitLinks {
         ...tag,
       });
       final matched = r.json['matched'] == true;
-      if (record && matched) _noteTap(null, t0);
+      if (record && matched) _noteTap(replyClickId(r.json['clickId']), t0);
       final dest = _destination(matched ? _str(r.json['longUrl']) : null);
       return _emit(LinkEvent(
         id: id, kind: LinkKind.deferred, route: LinkRoute.fingerprint,
