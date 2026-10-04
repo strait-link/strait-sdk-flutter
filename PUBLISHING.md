@@ -10,8 +10,8 @@ The package name (`<slug>_sdk`), homepage, repository and copyright holder come 
    (or edit `brand.json`, set `"final": true`, run `node scripts/brand.mjs --write`).
    Commit. Check the name is free: `https://pub.dev/packages/<name>`.
 2. **Make the GitHub repo public.**
-3. **Verified publisher (recommended):** pub.dev → sign in with the company Google
-   account → *Create publisher* → verify the domain (a DNS TXT record via Google
+3. **Verified publisher (recommended):** pub.dev → sign in with the Google
+   account that owns straitlink.in → *Create publisher* → verify the domain (a DNS TXT record via Google
    Search Console). Packages then show "verified publisher <domain>".
 4. **First version by hand** (pub.dev only allows automated publishing for a package
    that already exists):
