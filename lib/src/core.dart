@@ -31,6 +31,13 @@ enum AppLifecycle { active, background, inactive }
 /// needs the app and the browser at the tap to agree. (B2)
 int browserScreenWidth(num logicalWidth) => (logicalWidth - 0.001).ceil();
 
+/// The `screenWidth` device field (B17): the screen's SHORTER side, as a
+/// browser reports it. Safari's `screen.width` at the tap is the portrait width
+/// whatever the orientation, so an app first launched in landscape (844×390)
+/// still reports 390.
+int portraitScreenWidth(num logicalWidth, num logicalHeight) =>
+    browserScreenWidth(logicalWidth < logicalHeight ? logicalWidth : logicalHeight);
+
 class SplitUrl {
   final String scheme;
   final String host;

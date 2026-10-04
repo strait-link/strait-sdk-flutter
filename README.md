@@ -79,8 +79,9 @@ Future<StraitLinks> startStrait() async {
     deviceFields: () {
       final view = PlatformDispatcher.instance.views.first;
       return DeviceFields(
-        // Logical width rounded like the browser does (contract B2).
-        screenWidth: browserScreenWidth(view.physicalSize.width / view.devicePixelRatio),
+        // Portrait (shorter-side) logical width, rounded like the browser (contract B2, B17).
+        screenWidth: portraitScreenWidth(view.physicalSize.width / view.devicePixelRatio,
+            view.physicalSize.height / view.devicePixelRatio),
         pixelRatio: view.devicePixelRatio,
         language: PlatformDispatcher.instance.locale.toLanguageTag(),
         timezone: timezone,
@@ -195,8 +196,9 @@ B7 (Install Referrer → `/v1/referrer` with `parseStraitClick`, else
 · B14 (every open reported once, `strait.pendingOpens` retry queue,
 `pendingOpenReports`, `flushOpenReports`) · B15 (events carry the remembered
 tap id, `strait.lastTap`, `eventClickId`) · B16 (the tap id from the
-`/v1/resolve`, `/v1/match` and `/v1/referrer` replies, `replyClickId`). Both
-shared vector files (conformance v4) are asserted in `dart test`.
+`/v1/resolve`, `/v1/match` and `/v1/referrer` replies, `replyClickId`) · B17
+(portrait screen width, `portraitScreenWidth`). Both
+shared vector files (conformance v5) are asserted in `dart test`.
 
 ## How it matches
 

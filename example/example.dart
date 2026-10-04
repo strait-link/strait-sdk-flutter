@@ -13,7 +13,7 @@ Future<void> main() async {
     endpoint: 'https://go.yourbrand.com',
     platform: 'android',
     device: DeviceFields(
-      screenWidth: browserScreenWidth(392.7),
+      screenWidth: portraitScreenWidth(392.7, 872.7),
       pixelRatio: 2.75,
       language: 'en',
       timezone: 'Asia/Kolkata',

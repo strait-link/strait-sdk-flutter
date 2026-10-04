@@ -48,6 +48,14 @@ void main() {
     }
   });
 
+  group('portraitScreenWidth', () {
+    for (final c in v['portraitScreenWidth'] as List) {
+      test('${c['width']}x${c['height']}', () {
+        expect(portraitScreenWidth(c['width'] as num, c['height'] as num), c['expected']);
+      });
+    }
+  });
+
   Map<String, dynamic>? splitJson(SplitUrl? s) => s == null
       ? null
       : {'scheme': s.scheme, 'host': s.host, 'path': s.path, 'params': s.params};
