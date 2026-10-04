@@ -17,6 +17,16 @@ dart pub add strait_sdk      # Flutter apps: flutter pub add strait_sdk
 ```
 <!-- /brand:install -->
 
+Not on pub.dev yet. Until it is, add it as a git dependency in `pubspec.yaml`:
+
+```yaml
+dependencies:
+  strait_sdk:
+    git:
+      url: https://github.com/bazingga08/strait-sdk-flutter
+      ref: v0.7.1
+```
+
 Pure Dart (no Flutter dependency), so it works in Flutter apps and Dart servers alike.
 
 ## Use (recommended): `StraitLinks`
