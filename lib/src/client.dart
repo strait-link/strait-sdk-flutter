@@ -24,6 +24,19 @@ class MemoryStore implements KeyValueStore {
   Future<void> set(String key, String value) async => data[key] = value;
 }
 
+/// The app's clipboard, for the iPhone clipboard boost (contract B19). Pure
+/// Dart can't reach UIPasteboard, so the app supplies this (see README for a
+/// MethodChannel version). Used only when `clipboardBoost` is true, on iOS,
+/// once per install.
+abstract class StraitClipboard {
+  /// No prompt: whether the clipboard probably holds a web URL
+  /// (iOS `UIPasteboard.general.detectPatterns(for: [.probableWebURL])`).
+  Future<bool> hasProbableWebUrl();
+
+  /// The clipboard text. On iOS this shows the system "Allow Paste" prompt.
+  Future<String?> readText();
+}
+
 /// direct = the app was opened by a link; deferred = link tapped before install.
 enum LinkKind { direct, deferred }
 
@@ -32,7 +45,7 @@ class LinkEvent {
   final String id;
   final LinkKind kind;
 
-  /// app_link · custom_scheme · install_referrer · fingerprint.
+  /// app_link · custom_scheme · install_referrer · fingerprint · clipboard.
   final LinkRoute route;
   final AppStateAtLink appState;
   final bool matched;
@@ -134,6 +147,11 @@ class StraitLinks {
   final bool _ownsHttp;
   final int Function() _now;
 
+  /// iPhone clipboard boost (B19). Default false: the clipboard is never touched.
+  final bool clipboardBoost;
+  final StraitClipboard? _clipboard;
+  bool _firstLaunch = false;
+
   final _tracker = AppStateTracker();
   final _events = <LinkEvent>[];
   final _eventCtl = StreamController<LinkEvent>.broadcast();
@@ -150,7 +168,10 @@ class StraitLinks {
     Future<String?> Function()? installReferrer,
     http.Client? client,
     int Function()? now,
-  })  : _base = endpoint.replaceAll(RegExp(r'/+$'), ''),
+    this.clipboardBoost = false,
+    StraitClipboard? clipboard,
+  })  : _clipboard = clipboard,
+        _base = endpoint.replaceAll(RegExp(r'/+$'), ''),
         _linkHosts = normalizeLinkHosts(
             endpoint.replaceAll(RegExp(r'/+$'), ''), linkHosts),
         _storage = storage ?? MemoryStore(),
@@ -209,6 +230,7 @@ class StraitLinks {
       flag = '1';
     }
     final firstLaunch = flag != '1';
+    _firstLaunch = firstLaunch;
     if (initialUrl != null && initialUrl.isNotEmpty) {
       // Opened by a link on first launch = the user's intent right now: no
       // deferred check, but this open still counts as the install's first.
@@ -352,6 +374,29 @@ class StraitLinks {
           }
         }
       }
+      // B19: the clipboard boost, only when the app opted in, on iOS, on the
+      // once-per-install check (never the debug re-check).
+      if (record && clipboardBoost && platform == 'ios' && _clipboard != null) {
+        final token = await _handoffToken();
+        if (token != null) {
+          final c = await answered('/v1/handoff/claim', {
+            'publishableKey': publishableKey,
+            'token': token,
+            'platform': 'ios',
+            ...tag,
+          });
+          if (c.json['matched'] == true) {
+            _noteTap(replyClickId(c.json['clickId']), t0);
+            final dest = _destination(_str(c.json['longUrl']));
+            return _emit(LinkEvent(
+              id: id, kind: LinkKind.deferred, route: LinkRoute.clipboard,
+              appState: AppStateAtLink.closed, matched: true,
+              url: dest.url, path: dest.path, params: dest.params,
+              linkId: _str(c.json['linkId']), ms: _now() - t0, at: t0,
+            ));
+          }
+        }
+      }
       final r = await answered('/v1/match', {
         'publishableKey': publishableKey,
         'platform': platform,
@@ -371,6 +416,63 @@ class StraitLinks {
     } catch (_) {
       return _emit(LinkEvent(
         id: id, kind: LinkKind.deferred, route: LinkRoute.fingerprint,
+        appState: AppStateAtLink.closed, matched: false, reason: 'network',
+        ms: _now() - t0, at: t0,
+      ));
+    }
+  }
+
+  /// B19 steps 1-3: detect without a prompt, read only when a web URL is
+  /// likely (this shows iOS's paste prompt), keep only a Strait handoff token.
+  Future<String?> _handoffToken() async {
+    try {
+      final clip = _clipboard!;
+      if (!await clip.hasProbableWebUrl()) return null;
+      return parseHandoffUrl(await clip.readText(), _linkHosts);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Paste-button alternative (B19): claim a handoff link the user pasted
+  /// with your own paste control (no prompt: the tap is the consent). Text
+  /// that isn't a Strait handoff link gives `matched: false, reason:
+  /// 'not_handoff'` without a network call. Never throws.
+  Future<LinkEvent> claimHandoff(String? text) async {
+    final t0 = _now();
+    final id = newOpenId(t0);
+    _announce(LinkStart(id: id, kind: LinkKind.deferred, appState: AppStateAtLink.closed, at: t0));
+    final token = parseHandoffUrl(text, _linkHosts);
+    if (token == null) {
+      return _emit(LinkEvent(
+        id: id, kind: LinkKind.deferred, route: LinkRoute.clipboard,
+        appState: AppStateAtLink.closed, matched: false, reason: 'not_handoff',
+        ms: _now() - t0, at: t0,
+      ));
+    }
+    try {
+      final r = await _call('POST', '/v1/handoff/claim', {
+        'publishableKey': publishableKey,
+        'token': token,
+        'platform': platform,
+        'openId': id,
+        'firstLaunch': _firstLaunch,
+        'at': t0,
+      });
+      if (shouldRetryReport(r.status)) throw StateError('HTTP ${r.status}');
+      final matched = r.json['matched'] == true;
+      if (matched) _noteTap(replyClickId(r.json['clickId']), t0);
+      final dest = _destination(matched ? _str(r.json['longUrl']) : null);
+      return _emit(LinkEvent(
+        id: id, kind: LinkKind.deferred, route: LinkRoute.clipboard,
+        appState: AppStateAtLink.closed, matched: matched,
+        reason: matched ? null : (_str(r.json['reason']) ?? 'handoff_unknown'),
+        url: dest.url, path: dest.path, params: dest.params,
+        linkId: _str(r.json['linkId']), ms: _now() - t0, at: t0,
+      ));
+    } catch (_) {
+      return _emit(LinkEvent(
+        id: id, kind: LinkKind.deferred, route: LinkRoute.clipboard,
         appState: AppStateAtLink.closed, matched: false, reason: 'network',
         ms: _now() - t0, at: t0,
       ));

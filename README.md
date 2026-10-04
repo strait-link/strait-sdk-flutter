@@ -2,7 +2,9 @@
 
 Deep linking for Flutter: verified links and custom schemes open the right
 screen, and deferred links survive the install (the user taps your link,
-installs the app, and lands on the right screen). No clipboard paste banner.
+installs the app, and lands on the right screen). On iPhone it matches by
+default without touching the clipboard; an optional clipboard boost gives an
+exact match for apps that turn it on (see below).
 
 Part of [Strait](https://straitlink.in). The match signature is a Dart port of
 the shared Strait signature recipe and is checked against the **same golden vectors**
@@ -24,7 +26,7 @@ dependencies:
   strait_sdk:
     git:
       url: https://github.com/bazingga08/strait-sdk-flutter
-      ref: v0.7.2
+      ref: v0.8.0
 ```
 
 Pure Dart (no Flutter dependency), so it works in Flutter apps and Dart servers alike.
@@ -162,7 +164,7 @@ and `await strait.flushOpenReports()` (send now).
 | Field | Meaning |
 |---|---|
 | `kind` | `direct` (app opened by a link) / `deferred` (tapped before install) |
-| `route` | `app_link`, `custom_scheme`, `install_referrer`, `fingerprint` (`route.value`) |
+| `route` | `app_link`, `custom_scheme`, `install_referrer`, `fingerprint`, `clipboard` (`route.value`) |
 | `appState` | `closed`, `background`, `foreground` |
 | `matched`, `reason` | `reason`: `not_found`, `expired`, `password_protected`, `no_match`, `network`, `invalid_url` |
 | `rawUrl` | the URL the OS handed the app |
@@ -209,15 +211,110 @@ tap id, `strait.lastTap`, `eventClickId`) · B16 (the tap id from the
 `/v1/resolve`, `/v1/match` and `/v1/referrer` replies, `replyClickId`) · B17
 (portrait screen width, `portraitScreenWidth`) · B18 (reported and queued URLs
 carry no query or fragment except `utm_source`, `reportUrl`; expired remembered
-taps are deleted, `staleTap`). Both shared vector files (conformance v6) are
-asserted in `dart test`.
+taps are deleted, `staleTap`) · B19 (opt-in iPhone clipboard boost,
+`parseHandoffUrl`, `/v1/handoff/claim`, `claimHandoff`). Both shared vector
+files (conformance v7) are asserted in `dart test`.
+
+## iPhone install matching and the clipboard boost (B19)
+
+How iPhone install matching works, what it uses and how long it is kept:
+https://straitlink.in/docs/iphone-install-matching/
+
+**By default** the SDK never touches the clipboard. On the first launch of an
+iPhone install it asks the engine which tap this was, from a few signals the
+server sees (a keyed hash of the IP, screen, language, time zone, iOS version),
+kept for 1 hour and only used to open the right screen in your app. A workspace
+owner can turn this off in Dashboard → Settings → **iPhone install matching**;
+the engine then stores no device signals and iPhone installs get no deferred
+link (Android's Play Install Referrer is unaffected).
+
+**Clipboard boost (optional, exact).** Turn on the workspace setting
+`ios_clipboard_boost` (Dashboard → Settings) and pass `clipboardBoost: true`.
+The link page's "Get the app" button then copies a short-lived, single-use
+Strait link (`https://<your link host>/h/<token>`, 24 hours). On the first
+launch the SDK:
+
+1. asks iOS, **without a prompt**, whether the clipboard probably holds a web
+   URL (`UIPasteboard.detectPatterns(for: [.probableWebURL])`, iOS 15+);
+2. only if it does, reads the text. **iOS shows its "Allow Paste" prompt here.**
+   If the person taps Don't Allow, nothing is read;
+3. keeps it only if it is a Strait handoff link for your link hosts
+   (`parseHandoffUrl`); anything else never leaves the device;
+4. claims it (`POST /v1/handoff/claim`) for an exact match, else falls back to
+   the signal match.
+
+This package is pure Dart, so your app supplies the clipboard. iOS side
+(`ios/Runner/AppDelegate.swift`):
+
+```swift
+import UIKit
+import Flutter
+
+@main
+@objc class AppDelegate: FlutterAppDelegate {
+  override func application(_ application: UIApplication,
+      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+    let controller = window?.rootViewController as! FlutterViewController
+    FlutterMethodChannel(name: "strait/clipboard", binaryMessenger: controller.binaryMessenger)
+      .setMethodCallHandler { call, result in
+        switch call.method {
+        case "hasProbableWebUrl": // no prompt
+          guard #available(iOS 15.0, *) else { return result(false) }
+          UIPasteboard.general.detectPatterns(for: [.probableWebURL]) { r in
+            DispatchQueue.main.async { result((try? r.get())?.contains(.probableWebURL) ?? false) }
+          }
+        case "readText": // shows the iOS paste prompt
+          result(UIPasteboard.general.string)
+        default:
+          result(FlutterMethodNotImplemented)
+        }
+      }
+    GeneratedPluginRegistrant.register(with: self)
+    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+}
+```
+
+Dart side:
+
+```dart
+import 'package:flutter/services.dart';
+import 'package:strait_sdk/strait_sdk.dart';
+
+class ChannelClipboard implements StraitClipboard {
+  static const _ch = MethodChannel('strait/clipboard');
+  @override
+  Future<bool> hasProbableWebUrl() async =>
+      await _ch.invokeMethod<bool>('hasProbableWebUrl') ?? false;
+  @override
+  Future<String?> readText() => _ch.invokeMethod<String>('readText');
+}
+
+final strait = StraitLinks(
+  // …as above…
+  clipboardBoost: true,
+  clipboard: ChannelClipboard(),
+);
+```
+
+**Paste button instead of the prompt.** Apple's paste control
+(`UIPasteControl`, iOS 16+) pastes without a prompt because the tap is the
+consent. Show one (for example in a `UiKitView` platform view, or your own
+paste UI) on a "Continue where you left off" screen and pass the text to
+`strait.claimHandoff(text)`. It returns a `LinkEvent` (`route: clipboard`), or
+`reason: 'not_handoff'` without any network call when the text is not a
+Strait handoff link.
+
+The SDK only calls the adapter when `clipboardBoost` is true, on iOS, on the
+once-per-install check (never `checkDeferred()`).
 
 ## How it matches
 
 | Platform | Method | Precision |
 |----------|--------|-----------|
 | Android  | Play Install Referrer (`strait_link`) | deterministic (`install_referrer`) |
-| Android (no referrer) / iOS | server-side device fingerprint | probabilistic |
+| iOS, clipboard boost on and paste allowed | handoff link copied by the tap page (`/v1/handoff/claim`) | exact (`clipboard`) |
+| Android (no referrer) / iOS | server-side signal match | probabilistic |
 
 `resolveDeferredLink` never throws — returns `MatchResult.none` on any error.
 The client sends only coarse device fields; the **server** adds the observed IP

@@ -11,7 +11,8 @@ enum LinkRoute {
   appLink('app_link'),
   customScheme('custom_scheme'),
   installReferrer('install_referrer'),
-  fingerprint('fingerprint');
+  fingerprint('fingerprint'),
+  clipboard('clipboard');
 
   const LinkRoute(this.value);
 
@@ -341,4 +342,29 @@ class AppStateTracker {
         ? AppStateAtLink.background
         : AppStateAtLink.foreground;
   }
+}
+
+/// A clipboard-boost handoff token as the tap page mints it: 128 random bits,
+/// base64url (contract B19).
+final _handoffToken = RegExp(r'^[A-Za-z0-9_-]{22}$');
+final _handoffUrl =
+    RegExp(r'^([A-Za-z][A-Za-z0-9+.-]*)://([^/?#\s]+)/h/([^/?#\s]*)/?(?:[?#]\S*)?$');
+
+/// The handoff token inside text read from the clipboard (contract B19), or
+/// null. Only a Strait handoff link counts: `https://<link host>/h/<token>`,
+/// where the host is one of this app's link hosts ([normalizeLinkHosts]), the
+/// path is exactly `/h/<22 base64url chars>` (one trailing slash allowed), and
+/// the whole text (trimmed) is that one URL. A query or fragment after it is
+/// ignored. Scheme and host compare case-insensitively; path and token are
+/// case-sensitive. Anything else gives null and nothing is sent.
+String? parseHandoffUrl(String? text, List<String> linkHosts) {
+  if (text == null) return null;
+  final s = text.trim();
+  if (s.isEmpty || s.length > 2048) return null;
+  final m = _handoffUrl.firstMatch(s);
+  if (m == null || m.group(1)!.toLowerCase() != 'https') return null;
+  final host = m.group(2)!.toLowerCase();
+  if (!linkHosts.any((h) => h.toLowerCase() == host)) return null;
+  final token = m.group(3)!;
+  return _handoffToken.hasMatch(token) ? token : null;
 }

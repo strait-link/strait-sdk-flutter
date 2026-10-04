@@ -40,6 +40,15 @@ void main() {
     }
   });
 
+  group('parseHandoffUrl (B19)', () {
+    for (final c in v['parseHandoffUrl'] as List) {
+      test('${c['name']}', () {
+        expect(parseHandoffUrl(c['text'] as String?, (c['linkHosts'] as List).cast<String>()),
+            c['expected']);
+      });
+    }
+  });
+
   group('reportUrl (B18)', () {
     for (final c in v['reportUrl'] as List) {
       test(jsonEncode(c['input']), () {

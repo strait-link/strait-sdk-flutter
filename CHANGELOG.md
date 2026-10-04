@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.8.0
+
+- Optional iPhone clipboard boost (shared-spec/SDK-CONTRACT.md B19). New config
+  `clipboardBoost` (default **false**) and an app-supplied `StraitClipboard` adapter
+  (`hasProbableWebUrl`, `readText`; README shows a MethodChannel version). With it on, the
+  once-per-install check on iOS asks without a prompt whether the clipboard holds a web URL,
+  reads it only then (iOS shows its paste prompt), and claims a Strait handoff link via
+  `POST /v1/handoff/claim` for an exact match (`LinkRoute.clipboard`), else falls back to the
+  signal match. With it off (the default) the clipboard is never touched.
+- New `claimHandoff(text)` for a paste button (no prompt).
+- New core export `parseHandoffUrl` (conformance vectors v7).
+
 ## 0.7.2
 
 - Privacy hardening (shared-spec/SDK-CONTRACT.md B18): the URL sent with an open report
