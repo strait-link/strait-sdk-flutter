@@ -10,7 +10,7 @@ Future<void> main() async {
   // First launch after install: ask for the deferred link (never throws).
   final result = await resolveDeferredLink(
     publishableKey: 'st_pub_live_…', // Dashboard → Get started; never the secret key
-    endpoint: 'https://go.yourbrand.com',
+    endpoint: 'https://<your-handle>.strait.link',
     platform: 'android',
     device: DeviceFields(
       screenWidth: portraitScreenWidth(392.7, 872.7),

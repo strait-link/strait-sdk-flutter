@@ -4,8 +4,8 @@ Deep linking for Flutter: verified links and custom schemes open the right
 screen, and deferred links survive the install (the user taps your link,
 installs the app, and lands on the right screen). No clipboard paste banner.
 
-Part of [Strait](../). The match signature is a Dart port of
-[`shared-spec`](../shared-spec) and is checked against the **same golden vectors**
+Part of [Strait](https://straitlink.in). The match signature is a Dart port of
+the shared Strait signature recipe and is checked against the **same golden vectors**
 as the server, web, and React Native SDKs (run by `dart test` in CI) — so the
 signature can never drift across languages.
 
@@ -80,7 +80,7 @@ Future<StraitLinks> startStrait() async {
   final timezone = await FlutterTimezone.getLocalTimezone(); // IANA, e.g. Asia/Kolkata
   final strait = StraitLinks(
     publishableKey: 'st_pub_live_…', // Dashboard → Get started
-    endpoint: 'https://go.yourbrand.com',
+    endpoint: 'https://<your-handle>.strait.link',
     linkHosts: const ['links.yourbrand.com'], // extra custom domains, if any
     platform: Platform.isIOS ? 'ios' : Platform.isAndroid ? 'android' : 'other',
     storage: PrefsStore(await SharedPreferences.getInstance()),
@@ -143,7 +143,7 @@ Every time a link opens the app, the SDK reports it once (contract B14):
 | Browser handed off to the app (`yourapp://…`) | `/v1/open` | the exact tap (`strait_click`, removed before your app sees the URL) |
 | First open after a Play install | `/v1/referrer` | the exact tap that sent the user to the store |
 | First open after an App Store install | `/v1/match` | the matched tap |
-| Your own https links | `/v1/open` | host + path only (never the query) |
+| Your own https links | `/v1/open` | the URL (tap id removed); the server keeps host + path only, never the query |
 
 Reports that can't be sent (offline, server busy) are saved in `storage`
 (key `strait.pendingOpens`, so pass a persistent `KeyValueStore`) and retried
@@ -176,7 +176,7 @@ Still supported for apps that only want the deferred match:
 ```dart
 final result = await resolveDeferredLink(
   publishableKey: 'st_pub_live_…',
-  endpoint: 'https://go.yourbrand.com',
+  endpoint: 'https://<your-handle>.strait.link',
   platform: Platform.isIOS ? 'ios' : 'android',
   device: device, // DeviceFields as above
   installReferrer: referrer, // Android only; null otherwise
@@ -194,7 +194,7 @@ if (result.matched && result.longUrl != null) { /* route */ }
 ## SDK contract
 
 Implements every behaviour in
-[`shared-spec/SDK-CONTRACT.md`](../shared-spec/SDK-CONTRACT.md):
+the Strait SDK contract:
 B1 (publishableKey on every call) · B2 (`browserScreenWidth`) · B3 (short links
 → `/v1/resolve`, engine reason reported) · B4 (`classifyUrl`, tap id removed via
 `takeClickId`) · B5 (`AppStateTracker`) · B6 (once per install,
