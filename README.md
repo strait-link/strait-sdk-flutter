@@ -24,7 +24,7 @@ dependencies:
   strait_sdk:
     git:
       url: https://github.com/bazingga08/strait-sdk-flutter
-      ref: v0.7.1
+      ref: v0.7.2
 ```
 
 Pure Dart (no Flutter dependency), so it works in Flutter apps and Dart servers alike.
