@@ -156,7 +156,7 @@ void main() {
         'route': 'custom_scheme',
         'appState': 'background',
         'platform': 'android',
-        'url': 'https://shop.example/p/42?color=red',
+        'url': 'https://shop.example/p/42', // B18: no query
         'clickId': click,
         'matched': true,
         'firstLaunch': false,
@@ -308,6 +308,88 @@ void main() {
       }
       await settle();
       expect(h.events.map((e) => e.id).toSet(), hasLength(5));
+    });
+  });
+
+  group('B18: no query or fragment leaves the device or reaches storage', () {
+    const tapKey = 'strait.lastTap';
+    const day = 24 * 3600 * 1000;
+    test('the /v1/open report keeps only host, path and utm_source; the app still gets the full URL', () async {
+      final phone = FakePhone();
+      final engine = FakeEngine({'/v1/open': accepted});
+      final h = make(phone, engine, returning());
+      await h.start();
+      phone.tap('https://shop.example/p/42?email=jo%40x.com&utm_source=sms#reset-token');
+      await settle();
+      final e = h.events.last;
+      expect(e.rawUrl, 'https://shop.example/p/42?email=jo%40x.com&utm_source=sms#reset-token');
+      expect(e.params, {'email': 'jo@x.com', 'utm_source': 'sms'});
+      expect(engine.of('/v1/open').first.body!['url'], 'https://shop.example/p/42?utm_source=sms');
+    });
+    test('a failed short-link lookup is queued and resolved without its query or fragment', () async {
+      final phone = FakePhone();
+      final engine = FakeEngine({'/v1/resolve': offline, '/v1/open': offline});
+      final h = make(phone, engine, returning());
+      await h.start();
+      phone.tap('https://links.test/sale?session=s3cr3t&utm_source=wa#frag');
+      await settle();
+      expect(engine.of('/v1/resolve').first.body!['url'], 'https://links.test/sale?utm_source=wa');
+      final saved = h.storage.data['strait.pendingOpens']!;
+      expect(saved, isNot(contains('s3cr3t')));
+      expect((jsonDecode(saved) as List).first['url'], 'https://links.test/sale?utm_source=wa');
+    });
+    test('reports saved by an older SDK are stripped before they are sent or saved again', () async {
+      final phone = FakePhone();
+      final engine = FakeEngine({'/v1/open': offline});
+      final storage = returning();
+      storage.data['strait.pendingOpens'] = jsonEncode([
+        {
+          'openId': 'o_old_aaaaaaaaaaaa', 'kind': 'direct', 'route': 'app_link', 'appState': 'closed',
+          'platform': 'android', 'url': 'https://shop.example/p?token=abc#x', 'matched': true,
+          'firstLaunch': false, 'at': 1800000000000 - 1000,
+        }
+      ]);
+      final h = make(phone, engine, storage);
+      await h.start();
+      await h.strait.flushOpenReports();
+      expect(engine.of('/v1/open').first.body!['url'], 'https://shop.example/p');
+      expect(storage.data['strait.pendingOpens'], isNot(contains('token')));
+    });
+    test('an expired remembered tap is deleted at start, not only ignored', () async {
+      final phone = FakePhone();
+      final storage = returning();
+      storage.data[tapKey] = jsonEncode({'clickId': click, 'at': 1800000000000 - 8 * day});
+      final h = make(phone, FakeEngine({}), storage);
+      await h.start();
+      await settle();
+      expect(storage.data[tapKey], '');
+    });
+    test('a tap that expires while the app runs is deleted by trackEvent and not sent', () async {
+      final phone = FakePhone();
+      final engine = FakeEngine({'/v1/event': accepted});
+      final storage = returning();
+      storage.data[tapKey] = jsonEncode({'clickId': click, 'at': 1800000000000});
+      final h = make(phone, engine, storage);
+      await h.start();
+      await settle();
+      expect(storage.data[tapKey], contains(click)); // still valid at start
+      phone.advance(7 * day + 1);
+      await h.strait.trackEvent('purchase');
+      await settle();
+      expect(engine.of('/v1/event').first.body!.containsKey('clickId'), isFalse);
+      expect(storage.data[tapKey], '');
+    });
+    test('a valid remembered tap is kept and sent', () async {
+      final phone = FakePhone();
+      final engine = FakeEngine({'/v1/event': accepted});
+      final storage = returning();
+      storage.data[tapKey] = jsonEncode({'clickId': click, 'at': 1800000000000 - 1000});
+      final h = make(phone, engine, storage);
+      await h.start();
+      await h.strait.trackEvent('purchase');
+      await settle();
+      expect(engine.of('/v1/event').first.body!['clickId'], click);
+      expect(storage.data[tapKey], contains(click));
     });
   });
 

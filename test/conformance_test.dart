@@ -40,6 +40,22 @@ void main() {
     }
   });
 
+  group('reportUrl (B18)', () {
+    for (final c in v['reportUrl'] as List) {
+      test(jsonEncode(c['input']), () {
+        expect(reportUrl(c['input'] as String), c['expected']);
+      });
+    }
+  });
+
+  group('staleTap (B18)', () {
+    for (final c in v['staleTap'] as List) {
+      test('${c['name']}', () {
+        expect(staleTap(c['stored'] as String?, c['now'] as int), c['expected']);
+      });
+    }
+  });
+
   group('browserScreenWidth', () {
     for (final c in v['screenWidth'] as List) {
       test('${c['logical']}', () {

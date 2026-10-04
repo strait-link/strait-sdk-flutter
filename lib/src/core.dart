@@ -247,6 +247,34 @@ String? eventClickId(String? stored, int now, [String? explicit]) {
   return age >= 0 && age <= attributionWindowMs ? clickId.toLowerCase() : null;
 }
 
+/// True when the remembered tap ([stored], see [rememberTap]) is set but can
+/// no longer be used: unreadable, malformed, or opened more than
+/// [attributionWindowMs] before [now] (or after it). The SDK then deletes it
+/// instead of keeping it on the device (contract B18).
+bool staleTap(String? stored, int now) =>
+    stored != null && stored.isNotEmpty && eventClickId(stored, now) == null;
+
+/// The URL an SDK reports to the engine (`/v1/open`, `/v1/resolve`) or saves
+/// in the open queue (contract B18): the query string and fragment are
+/// removed, except the first `utm_source` pair, kept byte for byte, because
+/// the engine reads it for channel attribution. The engine keeps nothing else
+/// from the query: it stores host + path only. Mirrors the engine's query
+/// reading: the query is what sits before any '#', between the first and
+/// second '?'.
+String reportUrl(String url) {
+  final hash = url.indexOf('#');
+  final noFragment = hash < 0 ? url : url.substring(0, hash);
+  final q = noFragment.indexOf('?');
+  if (q < 0) return noFragment;
+  final base = noFragment.substring(0, q);
+  final query = noFragment.substring(q + 1).split('?').first;
+  for (final pair in query.split('&')) {
+    final eq = pair.indexOf('=');
+    if ((eq >= 0 ? pair.substring(0, eq) : pair) == 'utm_source') return '$base?$pair';
+  }
+  return base;
+}
+
 /// The tap id to remember after an attributed open the engine answered
 /// (contract B16): the reply's `clickId` when it is a valid tap id
 /// (lower-cased); else [fallback] when valid (a tap id the SDK already knew,

@@ -143,7 +143,7 @@ Every time a link opens the app, the SDK reports it once (contract B14):
 | Browser handed off to the app (`yourapp://…`) | `/v1/open` | the exact tap (`strait_click`, removed before your app sees the URL) |
 | First open after a Play install | `/v1/referrer` | the exact tap that sent the user to the store |
 | First open after an App Store install | `/v1/match` | the matched tap |
-| Your own https links | `/v1/open` | the URL (tap id removed); the server keeps host + path only, never the query |
+| Your own https links | `/v1/open` | host + path (plus `utm_source`, if any); the query and fragment never leave the device (B18) |
 
 Reports that can't be sent (offline, server busy) are saved in `storage`
 (key `strait.pendingOpens`, so pass a persistent `KeyValueStore`) and retried
@@ -207,8 +207,10 @@ B7 (Install Referrer → `/v1/referrer` with `parseStraitClick`, else
 `pendingOpenReports`, `flushOpenReports`) · B15 (events carry the remembered
 tap id, `strait.lastTap`, `eventClickId`) · B16 (the tap id from the
 `/v1/resolve`, `/v1/match` and `/v1/referrer` replies, `replyClickId`) · B17
-(portrait screen width, `portraitScreenWidth`). Both
-shared vector files (conformance v5) are asserted in `dart test`.
+(portrait screen width, `portraitScreenWidth`) · B18 (reported and queued URLs
+carry no query or fragment except `utm_source`, `reportUrl`; expired remembered
+taps are deleted, `staleTap`). Both shared vector files (conformance v6) are
+asserted in `dart test`.
 
 ## How it matches
 

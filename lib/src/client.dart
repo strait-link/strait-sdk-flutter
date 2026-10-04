@@ -184,6 +184,7 @@ class StraitLinks {
     Stream<String>? urls,
     Stream<AppLifecycle>? lifecycle,
   }) async {
+    _dropStaleTap(_now());
     if (lifecycle != null) {
       _subs.add(lifecycle.listen((s) {
         _tracker.onState(s, _now());
@@ -247,14 +248,16 @@ class StraitLinks {
     if (c.needsResolve) {
       // The lookup is also the open report (openId); the engine says whether
       // it recorded it, and anything short of that is retried via /v1/open.
+      // B18: only host + path (+ utm_source) leave the device or reach storage.
+      final sent = reportUrl(raw);
       final base = <String, dynamic>{
         'openId': id, 'kind': 'direct', 'route': 'app_link', 'appState': state.name,
-        'platform': platform, 'url': raw, 'matched': false, 'firstLaunch': firstLaunch, 'at': t0,
+        'platform': platform, 'url': sent, 'matched': false, 'firstLaunch': firstLaunch, 'at': t0,
       };
       try {
         final r = await _call('POST', '/v1/resolve', {
           'publishableKey': publishableKey,
-          'url': raw,
+          'url': sent,
           'platform': platform,
           'openId': id,
           'appState': state.name,
@@ -292,7 +295,7 @@ class StraitLinks {
     // Navigation never waits for the report.
     unawaited(_report({
       'openId': id, 'kind': 'direct', 'route': c.route.value, 'appState': state.name,
-      'platform': platform, 'url': c.url,
+      'platform': platform, 'url': c.url == null ? null : reportUrl(c.url!),
       if (c.clickId != null) 'clickId': c.clickId,
       'matched': true, 'firstLaunch': firstLaunch, 'at': t0,
     }));
@@ -385,6 +388,14 @@ class StraitLinks {
     _tapWrite = _tapWrite.then((_) => _storage.set(_tapKey, value)).catchError((_) {});
   }
 
+  /// B18: delete an expired remembered tap instead of only ignoring it.
+  /// Re-read inside the write chain so a newer tap written meanwhile is never lost.
+  void _dropStaleTap(int now) {
+    _tapWrite = _tapWrite.then((_) async {
+      if (staleTap(await _storage.get(_tapKey), now)) await _storage.set(_tapKey, '');
+    }).catchError((_) {});
+  }
+
   // ── Open reports (B14): every open is reported once; failures are saved in
   // storage and retried. Queue operations run one at a time (storage is async).
   Future<void> _queueOp = Future<void>.value();
@@ -399,7 +410,13 @@ class StraitLinks {
   Future<List<Map<String, dynamic>>> _readQueue() async {
     try {
       final v = jsonDecode(await _storage.get(_queueKey) ?? '[]');
-      return v is List ? v.whereType<Map<String, dynamic>>().toList() : [];
+      if (v is! List) return [];
+      // B18: reports saved by an older SDK may hold a full URL; strip it here
+      // so the next write leaves no query or fragment on the device.
+      return v.whereType<Map<String, dynamic>>().map((rep) {
+        final url = rep['url'];
+        return url is String ? {...rep, 'url': reportUrl(url)} : rep;
+      }).toList();
     } catch (_) {
       return [];
     }
@@ -494,6 +511,7 @@ class StraitLinks {
       try {
         stored = await _storage.get(_tapKey);
       } catch (_) {}
+      if (staleTap(stored, _now())) _dropStaleTap(_now());
       final tap = eventClickId(stored, _now(), clickId);
       return (await _call('POST', '/v1/event', {
         'publishableKey': publishableKey,
