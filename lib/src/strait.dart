@@ -36,11 +36,15 @@ class MatchResult {
   /// install_referrer | exact_ext | exact_core | none
   final String matchMethod;
 
+  /// When matched and the tap carried a referral code (preview, contract B21).
+  final String? referralCode;
+
   const MatchResult({
     required this.matched,
     required this.matchMethod,
     this.longUrl,
     this.linkId,
+    this.referralCode,
   });
 
   static const none = MatchResult(matched: false, matchMethod: 'none');
@@ -50,6 +54,7 @@ class MatchResult {
         matchMethod: (j['matchMethod'] as String?) ?? 'none',
         longUrl: j['longUrl'] as String?,
         linkId: j['linkId'] as String?,
+        referralCode: j['matched'] == true ? replyReferralCode(j['referralCode']) : null,
       );
 }
 

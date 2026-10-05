@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Referral codes (preview; shared-spec/proposals/referral-code.md, B21): a matched
+  deferred `LinkEvent` (Play referrer, iPhone match, clipboard claim, `claimHandoff`)
+  carries `referralCode` when the engine's reply has a valid one (also in `toJson`).
+  Legacy `MatchResult.referralCode` too. New core function `replyReferralCode`.
+
 ## 0.8.0
 
 - Optional iPhone clipboard boost (shared-spec/SDK-CONTRACT.md B19). New config

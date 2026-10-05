@@ -170,6 +170,7 @@ and `await strait.flushOpenReports()` (send now).
 | `rawUrl` | the URL the OS handed the app |
 | `url`, `path`, `params` | the destination to navigate to |
 | `linkId`, `ms`, `at`, `id` | link id, resolve time (ms), arrival time (epoch ms), id shared with `LinkStart` |
+| `referralCode` | deferred links only: the referral code the tap carried (link `referralCode` or `?strait_ref=`), else null. Preview, not switched on yet (contract B21); grant rewards from your server via the `referral.converted` webhook |
 
 ## Use (legacy): `resolveDeferredLink`
 
