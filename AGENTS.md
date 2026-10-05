@@ -81,7 +81,8 @@ https://straitlink.in/docs/troubleshooting/.
 
 - Test: `dart pub get && dart test` (must pass before any commit; check the exit code).
 - The match signature and the pure helpers are pinned by shared golden vectors
-  (`test/*vectors*.json`): byte-identical copies live in every SDK and the engine. Never edit a vector file
+  (`test/*vectors*.json`): byte-identical copies live in every app and web SDK (the signature vectors in the
+  engine too). Never edit a vector file
   here alone; vectors change only through `shared-spec/` and land in every repo together.
 - The package's public identity (name, scope, owner, domain) lives only in `brand.json`; change it with
   `shared-spec/scripts/rename-brand.sh` (all SDKs) or `node scripts/brand.mjs --write`.
