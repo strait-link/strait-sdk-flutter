@@ -287,6 +287,15 @@ String? replyClickId(Object? reply, [String? fallback]) {
   return null;
 }
 
+final RegExp _referralCodeRe = RegExp(r'^[A-Za-z0-9_-]{1,64}$');
+
+/// The referral code in a matched deferred reply (`/v1/referrer`, `/v1/match`,
+/// `/v1/handoff/claim`), or null (contract B21, proposal). Only a valid code
+/// (1-64 letters, digits, - or _) counts, kept exactly as sent; anything else,
+/// or an engine that sends no `referralCode`, gives null.
+String? replyReferralCode(Object? reply) =>
+    reply is String && _referralCodeRe.hasMatch(reply) ? reply : null;
+
 /// Whether a failed report should be kept for retry: no answer, 429 or 5xx.
 bool shouldRetryReport(int? status) => status == null || status == 429 || status >= 500;
 

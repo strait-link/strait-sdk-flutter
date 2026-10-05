@@ -62,6 +62,12 @@ class LinkEvent {
   final Map<String, String>? params;
   final String? linkId;
 
+  /// Deferred links only: the referral code the tap carried (the tap's
+  /// `?strait_ref=`, else the link's `referralCode`), when the engine sends
+  /// one. Who invited this install; reward them from your server (the
+  /// `referral.converted` webhook). Referrals are a preview (contract B21).
+  final String? referralCode;
+
   /// Time spent resolving, ms.
   final int ms;
 
@@ -82,6 +88,7 @@ class LinkEvent {
     this.path,
     this.params,
     this.linkId,
+    this.referralCode,
   });
 
   Map<String, dynamic> toJson() => {
@@ -96,6 +103,7 @@ class LinkEvent {
         if (path != null) 'path': path,
         if (params != null) 'params': params,
         if (linkId != null) 'linkId': linkId,
+        if (referralCode != null) 'referralCode': referralCode,
         'ms': ms,
         'at': at,
       };
@@ -369,7 +377,8 @@ class StraitLinks {
               id: id, kind: LinkKind.deferred, route: LinkRoute.installReferrer,
               appState: AppStateAtLink.closed, matched: true,
               url: dest.url, path: dest.path, params: dest.params,
-              linkId: _str(r.json['linkId']) ?? linkId, ms: _now() - t0, at: t0,
+              linkId: _str(r.json['linkId']) ?? linkId,
+              referralCode: replyReferralCode(r.json['referralCode']), ms: _now() - t0, at: t0,
             ));
           }
         }
@@ -392,7 +401,8 @@ class StraitLinks {
               id: id, kind: LinkKind.deferred, route: LinkRoute.clipboard,
               appState: AppStateAtLink.closed, matched: true,
               url: dest.url, path: dest.path, params: dest.params,
-              linkId: _str(c.json['linkId']), ms: _now() - t0, at: t0,
+              linkId: _str(c.json['linkId']),
+              referralCode: replyReferralCode(c.json['referralCode']), ms: _now() - t0, at: t0,
             ));
           }
         }
@@ -411,7 +421,8 @@ class StraitLinks {
         appState: AppStateAtLink.closed, matched: matched,
         reason: matched ? null : 'no_match',
         url: dest.url, path: dest.path, params: dest.params,
-        linkId: _str(r.json['linkId']), ms: _now() - t0, at: t0,
+        linkId: _str(r.json['linkId']),
+        referralCode: matched ? replyReferralCode(r.json['referralCode']) : null, ms: _now() - t0, at: t0,
       ));
     } catch (_) {
       return _emit(LinkEvent(
@@ -468,7 +479,8 @@ class StraitLinks {
         appState: AppStateAtLink.closed, matched: matched,
         reason: matched ? null : (_str(r.json['reason']) ?? 'handoff_unknown'),
         url: dest.url, path: dest.path, params: dest.params,
-        linkId: _str(r.json['linkId']), ms: _now() - t0, at: t0,
+        linkId: _str(r.json['linkId']),
+        referralCode: matched ? replyReferralCode(r.json['referralCode']) : null, ms: _now() - t0, at: t0,
       ));
     } catch (_) {
       return _emit(LinkEvent(
