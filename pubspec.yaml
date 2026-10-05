@@ -1,6 +1,6 @@
 name: strait_sdk
 description: Deep linking for Dart and Flutter apps. Direct links (App Links, Universal Links, custom schemes) and deferred links that survive the install.
-version: 0.8.0
+version: 0.8.1
 homepage: https://straitlink.in
 repository: https://github.com/bazingga08/strait-sdk-flutter
 issue_tracker: https://github.com/bazingga08/strait-sdk-flutter/issues

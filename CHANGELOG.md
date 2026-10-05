@@ -1,7 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.8.1
 
+- First version meant for pub.dev: the package is built with `.pubignore`, so tests,
+  CI, release tooling and internal `COUNCIL-*.md` notes stay out of the published archive.
+  No API removed or renamed; 0.8.0 apps update without code changes.
 - Referral codes (preview; shared-spec/proposals/referral-code.md, B21): a matched
   deferred `LinkEvent` (Play referrer, iPhone match, clipboard claim, `claimHandoff`)
   carries `referralCode` when the engine's reply has a valid one (also in `toJson`).
