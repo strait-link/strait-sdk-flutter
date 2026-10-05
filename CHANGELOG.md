@@ -9,6 +9,7 @@
   deferred `LinkEvent` (Play referrer, iPhone match, clipboard claim, `claimHandoff`)
   carries `referralCode` when the engine's reply has a valid one (also in `toJson`).
   Legacy `MatchResult.referralCode` too. New core function `replyReferralCode`.
+  (This code is already in the `v0.8.0` tag; its changelog listed it under Unreleased.)
 
 ## 0.8.0
 

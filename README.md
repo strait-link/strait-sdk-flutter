@@ -8,8 +8,8 @@ exact match for apps that turn it on (see below).
 
 Part of [Strait](https://straitlink.in). The match signature is a Dart port of
 the shared Strait signature recipe and is checked against the **same golden vectors**
-as the server, web, and React Native SDKs (run by `dart test` in CI) — so the
-signature can never drift across languages.
+as the server, web, and React Native SDKs (run by `dart test` in CI), so a
+signature that drifts from the other languages fails the build.
 
 ## Install
 
@@ -79,7 +79,7 @@ class LifecycleFeed with WidgetsBindingObserver {
 
 Future<StraitLinks> startStrait() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final timezone = await FlutterTimezone.getLocalTimezone(); // IANA, e.g. Asia/Kolkata
+  final timezone = (await FlutterTimezone.getLocalTimezone()).identifier; // IANA, e.g. Asia/Kolkata
   final strait = StraitLinks(
     publishableKey: 'st_pub_live_…', // Dashboard → Get started
     endpoint: 'https://<your-handle>.strait.link',
@@ -133,7 +133,8 @@ Notes:
 - Fingerprint debug: `strait.reportFingerprint()` then `strait.compareFingerprint()`.
 - `strait.checkDeferred()` re-runs the deferred check (debugging); it doesn't
   touch the once-per-install flag and never records an install.
-- `flutter_timezone` 4.x returns a `TimezoneInfo`; use `.identifier`.
+- `flutter_timezone` 5.0 and later returns a `TimezoneInfo` (hence `.identifier`);
+  4.x and earlier return the `String` itself, so drop `.identifier` there.
 
 ### What Strait records automatically (no extra code)
 
@@ -226,8 +227,9 @@ iPhone install it asks the engine which tap this was, from a few signals the
 server sees (a keyed hash of the IP, screen, language, time zone, iOS version),
 kept for 1 hour and only used to open the right screen in your app. A workspace
 owner can turn this off in Dashboard → Settings → **iPhone install matching**;
-the engine then stores no device signals and iPhone installs get no deferred
-link (Android's Play Install Referrer is unaffected).
+the engine then stores no device signals and iPhone installs get no signal
+match. Only the clipboard boost below, if turned on, can still give an iPhone
+install its deferred link (Android's Play Install Referrer is unaffected).
 
 **Clipboard boost (optional, exact).** Turn on the workspace setting
 `ios_clipboard_boost` (Dashboard → Settings) and pass `clipboardBoost: true`.
@@ -237,8 +239,9 @@ launch the SDK:
 
 1. asks iOS, **without a prompt**, whether the clipboard probably holds a web
    URL (`UIPasteboard.detectPatterns(for: [.probableWebURL])`, iOS 15+);
-2. only if it does, reads the text. **iOS shows its "Allow Paste" prompt here.**
-   If the person taps Don't Allow, nothing is read;
+2. only if it does, reads the text. **On iOS 16 and later, iOS shows its "Allow
+   Paste" prompt here** (iOS 15 reads without asking and shows a "pasted from"
+   notice). If the person taps Don't Allow, nothing is read;
 3. keeps it only if it is a Strait handoff link for your link hosts
    (`parseHandoffUrl`); anything else never leaves the device;
 4. claims it (`POST /v1/handoff/claim`) for an exact match, else falls back to
