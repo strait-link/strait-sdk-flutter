@@ -1,4 +1,9 @@
-# strait_sdk (Flutter / Dart)
+# Strait SDK for Flutter
+
+`strait_sdk` (Flutter / Dart)
+
+> **Availability:** Android: Live · iPhone install matching: **Beta** (not yet proven on a real iPhone) · SDK: Beta (installed from GitHub; not on pub.dev yet).
+> [Platform status](https://straitlink.in/platform-status/) · [Docs](https://straitlink.in/docs/)
 
 Deep linking for Flutter: verified links and custom schemes open the right
 screen, and deferred links survive the install (the user taps your link,
@@ -8,7 +13,7 @@ exact match for apps that turn it on (see below).
 
 Part of [Strait](https://straitlink.in). The match signature is a Dart port of
 the shared Strait signature recipe and is checked against the **same golden vectors**
-as the server, web, and React Native SDKs (run by `dart test` in CI) — so the
+as the server, web, and React Native SDKs (run by `dart test` in CI), so the
 signature can never drift across languages.
 
 ## Install
