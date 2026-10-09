@@ -140,6 +140,21 @@ Notes:
   touch the once-per-install flag and never records an install.
 - `flutter_timezone` 4.x returns a `TimezoneInfo`; use `.identifier`.
 
+### Old Firebase page.link links (contract B22)
+
+Moving off Firebase Dynamic Links? People who already have your app can keep opening it from old
+`<x>.page.link` links, as long as Google keeps serving page.link's app-link files (it still does today;
+nobody but Google controls page.link):
+
+1. Keep `applinks:<x>.page.link` (iOS) and the page.link intent filter (Android) in your next app build.
+2. Add the host: `StraitLinks(…, linkHosts: const ['<x>.page.link'])`.
+3. Import your old links in the dashboard (Import → Firebase); each keeps its old host and code.
+
+A page.link short link (`https://<x>.page.link/aBcD`) is then looked up like any Strait short link; a long link
+(`https://<x>.page.link/?link=https://…`) opens its `link=` destination on the device, with no network call.
+People without your app still land on whatever Google serves. Tested in unit tests only, not yet on a real
+iPhone.
+
 ### What Strait records automatically (no extra code)
 
 Every time a link opens the app, the SDK reports it once (contract B14):
@@ -218,8 +233,9 @@ tap id, `strait.lastTap`, `eventClickId`) · B16 (the tap id from the
 (portrait screen width, `portraitScreenWidth`) · B18 (reported and queued URLs
 carry no query or fragment except `utm_source`, `reportUrl`; expired remembered
 taps are deleted, `staleTap`) · B19 (opt-in iPhone clipboard boost,
-`parseHandoffUrl`, `/v1/handoff/claim`, `claimHandoff`). Both shared vector
-files (conformance v7) are asserted in `dart test`.
+`parseHandoffUrl`, `/v1/handoff/claim`, `claimHandoff`) · B22 (old Firebase
+page.link links: short → `/v1/resolve`, long → `link=` read on the device). Both
+shared vector files (conformance v8) are asserted in `dart test`.
 
 ## iPhone install matching and the clipboard boost (B19)
 
