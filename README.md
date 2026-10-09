@@ -289,14 +289,17 @@ The link page's "Get the app" button then copies a short-lived, single-use
 Strait link (`https://<your link host>/h/<token>`, 24 hours). On the first
 launch the SDK:
 
+0. runs device matching first (`POST /v1/match`). If that finds the install it
+   stops there: the clipboard is never touched and no prompt shows. Only on no
+   match (or a failed request) does it go on, with the same `openId`;
 1. asks iOS, **without a prompt**, whether the clipboard probably holds a web
    URL (`UIPasteboard.detectPatterns(for: [.probableWebURL])`, iOS 15+);
 2. only if it does, reads the text. **iOS shows its "Allow Paste" prompt here.**
    If the person taps Don't Allow, nothing is read;
 3. keeps it only if it is a Strait handoff link for your link hosts
    (`parseHandoffUrl`); anything else never leaves the device;
-4. claims it (`POST /v1/handoff/claim`) for an exact match, else falls back to
-   the signal match.
+4. claims it (`POST /v1/handoff/claim`) for an exact match, else keeps the
+   device match result.
 
 This package is pure Dart, so your app supplies the clipboard. iOS side
 (`ios/Runner/AppDelegate.swift`):

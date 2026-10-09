@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Clipboard boost order (B19): the first-launch iPhone check now runs device matching
+  (`/v1/match`) first and reads the clipboard / claims the handoff only when it returns no
+  match or fails. A device match no longer shows iOS's "Allow Paste" prompt. Same `openId`
+  across both attempts; one event. `claimHandoff` is unchanged.
 - Store sheet (beta): `StraitLinks.openStoreSheet(url, opener, [options])` calls
   `POST /v1/store-sheet`, then on Android tries Google Play inline install, `market://` and the Play
   web page (referrer carries `strait_link` + `strait_click`); on iPhone saves the device match

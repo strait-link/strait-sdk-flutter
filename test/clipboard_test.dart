@@ -123,8 +123,9 @@ void main() {
     final s = make(e, clip: SpyClipboard(), boost: true, storage: storage);
     await s.start();
     await Future<void>.delayed(Duration.zero);
-    expect(e.paths, isNot(contains('/v1/match')));
+    expect(e.paths, ['/v1/match', '/v1/handoff/claim']); // device matching first
     final b = e.body('/v1/handoff/claim')!;
+    expect(e.body('/v1/match')!['openId'], b['openId']); // one install, one openId
     expect(b['publishableKey'], pk);
     expect(b['token'], token);
     expect(b['platform'], 'ios');
@@ -140,16 +141,41 @@ void main() {
     expect(storage.data['strait.lastTap'], contains('3f2a9c1e-7b4d-4e8a-9c0f-1a2b3c4d5e6f'));
   });
 
-  test('claim refused (used/expired): falls back to /v1/match with the same openId', () async {
+  test('a device match wins: the clipboard is never touched (no paste prompt)', () async {
+    final clip = SpyClipboard();
+    final e = Engine({
+      '/v1/handoff/claim': claimed,
+      '/v1/match': {'matched': true, 'longUrl': 'https://shop.example/p/7', 'linkId': 'lnk_7'},
+    });
+    final s = make(e, clip: clip, boost: true);
+    await s.start();
+    expect(e.paths, ['/v1/match']);
+    expect(clip.detects + clip.reads, 0);
+    expect(s.events.single.route, LinkRoute.fingerprint);
+    expect(s.events.single.matched, isTrue);
+  });
+
+  test('device match fails (5xx): still tries the clipboard', () async {
+    final storage = MemoryStore();
+    final e = Engine({'/v1/handoff/claim': claimed}, status: {'/v1/match': 503});
+    final s = make(e, clip: SpyClipboard(), boost: true, storage: storage);
+    await s.start();
+    expect(e.paths, ['/v1/match', '/v1/handoff/claim']);
+    expect(s.events.single.route, LinkRoute.clipboard);
+    expect(storage.data['strait.deferredChecked'], '1');
+  });
+
+  test('claim refused (used/expired): keeps the device match result, same openId', () async {
     final e = Engine({
       '/v1/handoff/claim': {'matched': false, 'reason': 'handoff_used'},
       '/v1/match': noMatch,
     });
     final s = make(e, clip: SpyClipboard(), boost: true);
     await s.start();
-    expect(e.paths, ['/v1/handoff/claim', '/v1/match']);
+    expect(e.paths, ['/v1/match', '/v1/handoff/claim']);
     expect(e.body('/v1/match')!['openId'], e.body('/v1/handoff/claim')!['openId']);
     expect(s.events.single.route, LinkRoute.fingerprint);
+    expect(s.events.single.reason, 'no_match');
   });
 
   test('claim unanswered (5xx): network, checked again next launch', () async {

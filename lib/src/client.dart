@@ -355,7 +355,8 @@ class StraitLinks {
       return r;
     }
 
-    try {
+    // Signal matching (B7 referrer / B8 match). Returns the event, not emitted.
+    Future<LinkEvent> signal() async {
       if (platform == 'android') {
         String? referrer;
         try {
@@ -374,37 +375,13 @@ class StraitLinks {
           if (r.json['matched'] == true) {
             if (record) _noteTap(replyClickId(r.json['clickId'], clickId), t0);
             final dest = _destination(_str(r.json['longUrl']));
-            return _emit(LinkEvent(
+            return LinkEvent(
               id: id, kind: LinkKind.deferred, route: LinkRoute.installReferrer,
               appState: AppStateAtLink.closed, matched: true,
               url: dest.url, path: dest.path, params: dest.params,
               linkId: _str(r.json['linkId']) ?? linkId,
               referralCode: replyReferralCode(r.json['referralCode']), ms: _now() - t0, at: t0,
-            ));
-          }
-        }
-      }
-      // B19: the clipboard boost, only when the app opted in, on iOS, on the
-      // once-per-install check (never the debug re-check).
-      if (record && clipboardBoost && platform == 'ios' && _clipboard != null) {
-        final token = await _handoffToken();
-        if (token != null) {
-          final c = await answered('/v1/handoff/claim', {
-            'publishableKey': publishableKey,
-            'token': token,
-            'platform': 'ios',
-            ...tag,
-          });
-          if (c.json['matched'] == true) {
-            _noteTap(replyClickId(c.json['clickId']), t0);
-            final dest = _destination(_str(c.json['longUrl']));
-            return _emit(LinkEvent(
-              id: id, kind: LinkKind.deferred, route: LinkRoute.clipboard,
-              appState: AppStateAtLink.closed, matched: true,
-              url: dest.url, path: dest.path, params: dest.params,
-              linkId: _str(c.json['linkId']),
-              referralCode: replyReferralCode(c.json['referralCode']), ms: _now() - t0, at: t0,
-            ));
+            );
           }
         }
       }
@@ -417,17 +394,54 @@ class StraitLinks {
       final matched = r.json['matched'] == true;
       if (record && matched) _noteTap(replyClickId(r.json['clickId']), t0);
       final dest = _destination(matched ? _str(r.json['longUrl']) : null);
-      return _emit(LinkEvent(
+      return LinkEvent(
         id: id, kind: LinkKind.deferred, route: LinkRoute.fingerprint,
         appState: AppStateAtLink.closed, matched: matched,
         reason: matched ? null : 'no_match',
         url: dest.url, path: dest.path, params: dest.params,
         linkId: _str(r.json['linkId']),
         referralCode: matched ? replyReferralCode(r.json['referralCode']) : null, ms: _now() - t0, at: t0,
+      );
+    }
+
+    LinkEvent result;
+    try {
+      result = await signal();
+    } catch (_) {
+      result = LinkEvent(
+        id: id, kind: LinkKind.deferred, route: LinkRoute.fingerprint,
+        appState: AppStateAtLink.closed, matched: false, reason: 'network',
+        ms: _now() - t0, at: t0,
+      );
+    }
+    // B19: device matching first; the clipboard only when it found nothing,
+    // only when the app opted in, on iOS, on the once-per-install check (never
+    // the debug re-check). Same openId across both attempts, one event.
+    if (result.matched || !(record && clipboardBoost && platform == 'ios' && _clipboard != null)) {
+      return _emit(result);
+    }
+    final token = await _handoffToken();
+    if (token == null) return _emit(result);
+    try {
+      final c = await answered('/v1/handoff/claim', {
+        'publishableKey': publishableKey,
+        'token': token,
+        'platform': 'ios',
+        ...tag,
+      });
+      if (c.json['matched'] != true) return _emit(result); // not claimable: keep the match result
+      _noteTap(replyClickId(c.json['clickId']), t0);
+      final dest = _destination(_str(c.json['longUrl']));
+      return _emit(LinkEvent(
+        id: id, kind: LinkKind.deferred, route: LinkRoute.clipboard,
+        appState: AppStateAtLink.closed, matched: true,
+        url: dest.url, path: dest.path, params: dest.params,
+        linkId: _str(c.json['linkId']),
+        referralCode: replyReferralCode(c.json['referralCode']), ms: _now() - t0, at: t0,
       ));
     } catch (_) {
       return _emit(LinkEvent(
-        id: id, kind: LinkKind.deferred, route: LinkRoute.fingerprint,
+        id: id, kind: LinkKind.deferred, route: LinkRoute.clipboard,
         appState: AppStateAtLink.closed, matched: false, reason: 'network',
         ms: _now() - t0, at: t0,
       ));
