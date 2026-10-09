@@ -177,6 +177,55 @@ and `await strait.flushOpenReports()` (send now).
 | `linkId`, `ms`, `at`, `id` | link id, resolve time (ms), arrival time (epoch ms), id shared with `LinkStart` |
 | `referralCode` | deferred links only: the referral code the tap carried (link `referralCode` or `?strait_ref=`), else null. Preview, not switched on yet (contract B21); grant rewards from your server via the `referral.converted` webhook |
 
+## Store sheet (beta; iPhone is beta)
+
+When a user taps **Install** for one of your other apps (a sibling, partner or
+"lite" app), show the app store *inside your app* and keep the deep link for the
+app being installed.
+
+```dart
+final result = await strait.openStoreSheet(
+  'https://<handle>.strait.link/promo',
+  ChannelStoreSheetOpener(),                         // yours, below
+  const StoreSheetOptions(callerId: 'com.yourcompany.app'), // Android inline sheet
+);
+// result.method: inline_install | market | web | product_page | overlay | none
+```
+
+Pure Dart can't start an Intent or show StoreKit, so pass a `StoreSheetOpener`.
+A MethodChannel version:
+
+```dart
+class ChannelStoreSheetOpener extends StoreSheetOpener {
+  static const _ch = MethodChannel('strait/store_sheet');
+  @override
+  Future<bool> androidIntent(StoreIntent i) async =>
+      await _ch.invokeMethod<bool>('openIntent', i.toMap()) ?? false;
+  @override
+  Future<bool> iosProduct(StoreProduct p, StoreSheetStyle style) async =>
+      await _ch.invokeMethod<bool>('presentProduct', {...p.toMap(), 'style': style.wire}) ?? false;
+}
+```
+
+On the native side, `openIntent` builds `Intent(action, Uri.parse(data))`, sets
+the package when given, puts the extras, starts it and returns false on
+`ActivityNotFoundException` (sdk-android README section 5). `presentProduct`
+shows `SKStoreProductViewController` or `SKOverlay` (sdk-swift's
+`SystemStoreSheetPresenter`).
+
+- **Android:** Google Play inline install (a half-sheet over your app; Google
+  labels it a test feature), then the Play app, then the Play web page, each
+  with `referrer=strait_link=<id>&strait_click=<tap>`. The installed app's Play
+  Install Referrer match reads it exactly.
+- **iPhone:** saves this device's match fields for the tap (unless the workspace
+  turned iPhone install matching off), copies the clipboard-boost handoff link
+  with `copyHandoffLink: true` (override `writeClipboard`), then shows the App
+  Store with the link's campaign as the `ct` token.
+
+The tap is recorded with `sent_to = store_sheet` and is not billed during the
+beta. It works only where your app is the host: a link tapped inside another
+company's app can't open a store sheet there.
+
 ## Use (legacy): `resolveDeferredLink`
 
 Still supported for apps that only want the deferred match:

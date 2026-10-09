@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import 'strait.dart' show DeviceFields;
 import 'core.dart';
+import 'store_sheet.dart';
 
 /// Persistent key/value storage, e.g. a `shared_preferences` wrapper.
 abstract class KeyValueStore {
@@ -665,6 +666,30 @@ class StraitLinks {
     _events.add(e);
     if (!_eventCtl.isClosed) _eventCtl.add(e);
     return e;
+  }
+
+  /// Store sheet (beta; iPhone is beta): show the app store inside your app
+  /// for one of your short links and keep the deep link for the app being
+  /// installed. [opener] starts the Intent / shows StoreKit (README "Store
+  /// sheet"). Never throws.
+  Future<StoreSheetResult> openStoreSheet(String url, StoreSheetOpener opener,
+      [StoreSheetOptions options = const StoreSheetOptions()]) async {
+    try {
+      return await runStoreSheet(
+        call: (path, body) async {
+          final r = await _call('POST', path, body);
+          return (ok: r.ok, status: r.status, json: r.json);
+        },
+        publishableKey: publishableKey,
+        platform: platform,
+        device: () => _device().toJson(),
+        url: url,
+        options: options,
+        opener: opener,
+      );
+    } catch (_) {
+      return const StoreSheetResult(false, 'none', reason: 'error');
+    }
   }
 
   Future<_Res> _call(String method, String path, [Map<String, dynamic>? body]) async {

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Store sheet (beta): `StraitLinks.openStoreSheet(url, opener, [options])` calls
+  `POST /v1/store-sheet`, then on Android tries Google Play inline install, `market://` and the Play
+  web page (referrer carries `strait_link` + `strait_click`); on iPhone saves the device match
+  (`/v1/match-save`), optionally copies the handoff link, and shows the App Store through your
+  `StoreSheetOpener` (MethodChannel example in the README). New `lib/src/store_sheet.dart`.
 - Docs and tests only, no code change. README gains a Support section; AGENTS.md gains a
   "stop and ask the human" list (signup and keys, handle, dashboard app settings, signing and
   store builds, the real-phone test) and a no-phone verify loop (`/v1/tools/app-links`,
