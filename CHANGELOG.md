@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- Docs and tests only, no code change. README gains a Support section; AGENTS.md gains a
+  "stop and ask the human" list (signup and keys, handle, dashboard app settings, signing and
+  store builds, the real-phone test) and a no-phone verify loop (`/v1/tools/app-links`,
+  `/v1/simulate`), and says plainly that the package is not on pub.dev yet.
+- Demo names: test and doc hosts move to reserved names (`hilltop.links.test`,
+  `go.hilltop.example`, `jo@hilltop.example`); `conformance-vectors.json` re-copied from
+  shared-spec 11779b1 (inputs renamed, every expected value unchanged).
+
 ## 0.8.1
 
 - First version meant for pub.dev: the package is built with `.pubignore`, so tests,

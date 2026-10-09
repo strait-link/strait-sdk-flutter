@@ -319,11 +319,11 @@ void main() {
       final engine = FakeEngine({'/v1/open': accepted});
       final h = make(phone, engine, returning());
       await h.start();
-      phone.tap('https://shop.example/p/42?email=jo%40x.com&utm_source=sms#reset-token');
+      phone.tap('https://shop.example/p/42?email=jo%40hilltop.example&utm_source=sms#reset-token');
       await settle();
       final e = h.events.last;
-      expect(e.rawUrl, 'https://shop.example/p/42?email=jo%40x.com&utm_source=sms#reset-token');
-      expect(e.params, {'email': 'jo@x.com', 'utm_source': 'sms'});
+      expect(e.rawUrl, 'https://shop.example/p/42?email=jo%40hilltop.example&utm_source=sms#reset-token');
+      expect(e.params, {'email': 'jo@hilltop.example', 'utm_source': 'sms'});
       expect(engine.of('/v1/open').first.body!['url'], 'https://shop.example/p/42?utm_source=sms');
     });
     test('a failed short-link lookup is queued and resolved without its query or fragment', () async {

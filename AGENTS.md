@@ -7,7 +7,8 @@ Pure Dart. The app hands it the launch link, a stream of later links and the lif
 
 ## Install
 
-Not on pub.dev yet: a git dependency, plus the helper packages.
+**Not on pub.dev yet** (`flutter pub add strait_sdk` fails until it is published). Use a git
+dependency, plus the helper packages. Don't invent a pub.dev version or switch to a hosted dependency.
 
 ```yaml
 # pubspec.yaml
@@ -31,12 +32,28 @@ Native link settings as for any app: Android App Links intent filter (`autoVerif
 - **Secret key** `st_live_…` (Dashboard → Settings → Secret keys): server only. Never put it in an app: anyone can extract it and change your links.
 - Never commit either key's real value to this repo, tests or examples. Use placeholders like `st_pub_live_…`.
 
+## Stop and ask the human (an agent can't do these)
+
+Stop, say exactly what you need and why, and wait. Don't guess, fake or skip these:
+
+1. **Account and keys.** Signing up at https://app.straitlink.in and copying the publishable key
+   (`st_pub_live_…`) and, for server code, the secret key. There is no signup API. Ask the human to paste
+   the publishable key; never ask for or handle the secret key in app code.
+2. **The workspace handle.** The `<handle>` in `https://<handle>.strait.link` (Dashboard). Don't make one up.
+3. **Dashboard app settings.** Android package name, every SHA-256 signing fingerprint (including the Play
+   App Signing key from Play Console → App integrity), the custom scheme, and for iPhone the Apple Team ID
+   and bundle ID. There is no settings API yet, so even when the checker below finds the problem, the human
+   fixes it in Dashboard → Settings.
+4. **Signing and store builds.** Release keystores, Play Console internal-testing uploads, Xcode signing and
+   the Associated Domains capability.
+5. **A real phone.** The final tap test (steps 4 to 6 below) needs a person with a device.
+
 ## Receive links: the one pattern
 
 ```dart
 final links = StraitLinks(
   publishableKey: 'st_pub_live_…',        // never the secret key
-  endpoint: 'https://acme.strait.link',       // the workspace's link domain
+  endpoint: 'https://hilltop.strait.link',   // the workspace's link domain
   platform: Platform.isIOS ? 'ios' : Platform.isAndroid ? 'android' : 'other',
   storage: PrefsStore(await SharedPreferences.getInstance()),   // a KeyValueStore
   installReferrer: () async => Platform.isAndroid ? (await PlayInstallReferrer.installReferrer).installReferrer : null,
@@ -56,21 +73,32 @@ The full `PrefsStore`, `LifecycleFeed` and `deviceFields` code is in the docs. P
 
 ## Verify
 
-Run these; don't assume.
+Run these; don't assume. Steps 1 to 3 need no phone, so run them in a loop after every config change
+until they pass, then hand over to the human for steps 4 to 6.
 
 ```sh
-# 1. The link domain serves the verification files with this app in them
+# 1. Keyless App Links / Universal Links checker (no key; 10 per minute). Want: no "error" findings
+curl "https://strait.link/v1/tools/app-links?domain=<handle>.strait.link"
+
+# 2. Dry-run a tap without recording it or counting it toward the plan. Want: the decision and
+#    location you expect for each user agent (not "blocked", "not_live" or "expired")
+curl "https://strait.link/v1/simulate?url=https://<handle>.strait.link/<slug>&ua=android&publishableKey=st_pub_live_…"
+curl "https://strait.link/v1/simulate?url=https://<handle>.strait.link/<slug>&ua=whatsapp-android&publishableKey=st_pub_live_…"
+```
+
+```sh
+# 3. The link domain serves the verification files with this app in them
 curl https://<handle>.strait.link/.well-known/assetlinks.json              # Android: package + every SHA-256
 curl https://<handle>.strait.link/.well-known/apple-app-site-association   # iPhone: TeamID.bundleId
-#    (or the free checker: https://straitlink.in/tools/  ·  MCP tool: check_app_links)
+#    (or the free checker: https://straitlink.in/tools/  ·  MCP tool check_app_links, once the MCP server is published)
 
-# 2. Android verified the host (fresh install). Want: verified
+# 4. Android verified the host (fresh install). Want: verified
 adb shell pm get-app-links <package.name>
 ```
 
-3. Tap a link from WhatsApp or Gmail on a real phone: the app opens on the right screen and `onLink` fires
+5. Tap a link from WhatsApp or Gmail on a real phone: the app opens on the right screen and `onLink` fires
    with `matched: true`. The tap and the open appear in Dashboard → Analytics.
-4. Deferred (Android): install from a Google Play internal-testing build, tap the link before installing, open
+6. Deferred (Android): install from a Google Play internal-testing build, tap the link before installing, open
    the app: `onLink` fires with `kind: deferred`, `route: install_referrer`. iPhone install matching is in beta.
 
 If links open the browser: a missing SHA-256 (most often the Play App Signing key from Play Console → App
@@ -89,6 +117,11 @@ https://straitlink.in/docs/troubleshooting/.
   headers `X-Strait-*`. Don't rename them.
 - Brand: Strait (never "Straight"). Don't write superlatives ("best", "cheapest") or speed / match-rate numbers in
   docs or comments. iPhone install matching is in beta.
+
+## Support
+
+support@straitlink.in (replies within 1 working day, IST) or a GitHub issue on this repo. Security issues go
+to security@straitlink.in, never a public issue (SECURITY.md).
 
 ## More
 

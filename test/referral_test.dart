@@ -8,8 +8,8 @@ import 'package:test/test.dart';
 /// Contract B21 (proposal): a matched deferred reply's `referralCode` reaches
 /// the app on the LinkEvent, unchanged, only when it is a valid code.
 const pk = 'st_pub_test_appowner01';
-const endpoint = 'https://acme.links.test';
-const handoff = 'https://acme.links.test/h/AbCdEfGhIjKlMnOpQrStUv';
+const endpoint = 'https://hilltop.links.test';
+const handoff = 'https://hilltop.links.test/h/AbCdEfGhIjKlMnOpQrStUv';
 const device = DeviceFields(screenWidth: 390, pixelRatio: 3, language: 'en-IN', timezone: 'Asia/Kolkata');
 const matched = {
   'matched': true,

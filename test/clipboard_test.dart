@@ -8,9 +8,9 @@ import 'package:test/test.dart';
 /// Contract B19: the iPhone clipboard boost is opt-in, and the SDK never
 /// touches the clipboard unless the app turned it on.
 const pk = 'st_pub_test_appowner01';
-const endpoint = 'https://acme.links.test';
+const endpoint = 'https://hilltop.links.test';
 const token = 'AbCdEfGhIjKlMnOpQrStUv';
-const handoff = 'https://acme.links.test/h/$token';
+const handoff = 'https://hilltop.links.test/h/$token';
 const device = DeviceFields(screenWidth: 390, pixelRatio: 3, language: 'en-IN', timezone: 'Asia/Kolkata');
 
 class SpyClipboard implements StraitClipboard {

@@ -336,3 +336,12 @@ dart pub get && dart test
 (URL / referrer / app-state logic) enforce byte-for-byte parity with the other
 SDKs; `test/client_test.dart` covers the client scenarios with a fake engine and
 fake lifecycle; `test/opens_test.dart` covers open reporting (B14).
+
+## Support
+
+Questions or a bug: **support@straitlink.in** (replies within 1 working day, IST) or
+[open a GitHub issue](https://github.com/bazingga08/strait-sdk-flutter/issues). Please include the
+`strait_sdk` version, your Flutter version, the platform (Android / iPhone) and the link you tapped.
+Security issues: don't open an issue; see [SECURITY.md](SECURITY.md) (security@straitlink.in).
+
+Docs: https://straitlink.in/docs/sdks/flutter/ · Platform status: https://straitlink.in/platform-status/

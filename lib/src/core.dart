@@ -91,8 +91,8 @@ String _decode(String s) {
 }
 
 /// The hosts that serve this app's short links: the endpoint's host plus any
-/// configured link domains, given as URLs (`https://go.brand.com`) or bare
-/// hosts (`go.brand.com`). Lower-cased, de-duplicated, order kept; anything
+/// configured link domains, given as URLs (`https://go.hilltop.example`) or bare
+/// hosts (`go.hilltop.example`). Lower-cased, de-duplicated, order kept; anything
 /// else (blank, paths, spaces) is ignored.
 List<String> normalizeLinkHosts(String endpoint, [List<String> linkHosts = const []]) {
   final out = <String>[];
