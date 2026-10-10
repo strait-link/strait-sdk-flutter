@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- README: the common Strait SDK header (logo, the promise "Straight to the screen. On the record.",
+  badges, links to docs, platform status and the changelog), a platform features table in the
+  availability words (Live / Beta / Planned / Not yet) with the iPhone beta truth (the method is
+  the customer's choice, device matching off by default), and a "Docs and support" section
+  (Talk to the Strait team). The same structure in all seven SDK READMEs (design system v5).
+- `example/example.dart` uses the sample Hilltop Shoes link host instead of `go.yourbrand.com`.
 - iPhone deferred method is the customer's choice, at runtime (founder decision 10 Oct 2026):
   the SDK tries the paste handoff only when the engine's `/v1/match` reply has no match and
   says `ios.pasteHandoff: true` (Dashboard → Settings → iPhone installs). Nothing is stored or

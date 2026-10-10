@@ -4,7 +4,8 @@ import 'package:strait_sdk/strait_sdk.dart';
 
 Future<void> main() async {
   // Classify an incoming URL: a short link needs resolving, anything else is a destination.
-  final link = classifyUrl('https://go.yourbrand.com/launch', ['go.yourbrand.com']);
+  // Sample data: Hilltop Shoes, a made-up shop; use your own link host.
+  final link = classifyUrl('https://hilltop.strait.link/launch', ['hilltop.strait.link']);
   print('needs resolve: ${link?.needsResolve}');
 
   // First launch after install: ask for the deferred link (never throws).
