@@ -1,7 +1,11 @@
 # Changelog
 
-## Unreleased
+## 0.8.2
 
+- First version on pub.dev. `v0.8.1` is a GitHub tag only and was never uploaded, so pub.dev
+  starts at 0.8.2. Install lines written as `strait_sdk: ^0.8.1` resolve to it.
+- Package metadata for pub.dev: homepage, repository, issue tracker, topics, and a runnable
+  `example/example.dart`. The release workflow pins its actions by commit SHA.
 - README: the common Strait SDK header (logo, the promise "Straight to the screen. On the record.",
   badges, links to docs, platform status and the changelog), a platform features table in the
   availability words (Live / Beta / Planned / Not yet) with the iPhone beta truth (the method is
