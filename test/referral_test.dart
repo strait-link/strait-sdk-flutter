@@ -37,7 +37,6 @@ StraitLinks make(Map<String, Object> routes, {String platform = 'ios', String? r
       }),
       now: () => 1000000,
       installReferrer: referrer == null ? null : () async => referrer,
-      clipboardBoost: boost,
       clipboard: boost ? Clip() : null,
     );
 
@@ -68,7 +67,10 @@ void main() {
   });
 
   test('clipboard boost claim and the Paste button', () async {
-    final routes = {'/v1/handoff/claim': {...matched, 'matchMethod': 'clipboard', 'referralCode': 'ASHA42'}, '/v1/match': {'matched': false}};
+    final routes = {
+      '/v1/handoff/claim': {...matched, 'matchMethod': 'clipboard', 'referralCode': 'ASHA42'},
+      '/v1/match': {'matched': false, 'ios': {'deviceMatching': true, 'pasteHandoff': true}},
+    };
     final s = make(routes, boost: true);
     await s.start();
     expect(s.events.single.route, LinkRoute.clipboard);

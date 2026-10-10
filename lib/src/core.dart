@@ -359,6 +359,18 @@ final _handoffToken = RegExp(r'^[A-Za-z0-9_-]{22}$');
 final _handoffUrl =
     RegExp(r'^([A-Za-z][A-Za-z0-9+.-]*)://([^/?#\s]+)/h/([^/?#\s]*)/?(?:[?#]\S*)?$');
 
+/// Whether a `/v1/match` reply says to try the paste handoff (contract B19):
+/// the workspace's live choice in Dashboard Settings -> iPhone installs,
+/// `reply.ios.pasteHandoff`. Only an unmatched reply counts, and a missing
+/// field (an older engine) means off. Read on every check, never stored, so a
+/// dashboard change applies without an app release.
+bool pasteHandoffOn(Object? reply) {
+  if (reply is! Map) return false;
+  if (reply['matched'] == true) return false;
+  final ios = reply['ios'];
+  return ios is Map && ios['pasteHandoff'] == true;
+}
+
 /// The handoff token inside text read from the clipboard (contract B19), or
 /// null. Only a Strait handoff link counts: `https://<link host>/h/<token>`,
 /// where the host is one of this app's link hosts ([normalizeLinkHosts]), the

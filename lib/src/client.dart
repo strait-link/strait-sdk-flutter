@@ -27,8 +27,9 @@ class MemoryStore implements KeyValueStore {
 
 /// The app's clipboard, for the iPhone clipboard boost (contract B19). Pure
 /// Dart can't reach UIPasteboard, so the app supplies this (see README for a
-/// MethodChannel version). Used only when `clipboardBoost` is true, on iOS,
-/// once per install.
+/// MethodChannel version). Used on iOS, once per install, only when the
+/// workspace turned on Paste handoff in the dashboard and device matching
+/// found nothing (the engine says so live in the `/v1/match` reply).
 abstract class StraitClipboard {
   /// No prompt: whether the clipboard probably holds a web URL
   /// (iOS `UIPasteboard.general.detectPatterns(for: [.probableWebURL])`).
@@ -156,7 +157,11 @@ class StraitLinks {
   final bool _ownsHttp;
   final int Function() _now;
 
-  /// iPhone clipboard boost (B19). Default false: the clipboard is never touched.
+  /// Deprecated and ignored. Whether the SDK tries the paste handoff is the
+  /// customer's choice in Dashboard Settings -> iPhone installs, read live
+  /// from the engine on every check (no app release needed). Kept so existing
+  /// code still compiles.
+  @Deprecated('Ignored: the workspace setting (Dashboard Settings -> iPhone installs) decides at runtime.')
   final bool clipboardBoost;
   final StraitClipboard? _clipboard;
   bool _firstLaunch = false;
@@ -177,6 +182,7 @@ class StraitLinks {
     Future<String?> Function()? installReferrer,
     http.Client? client,
     int Function()? now,
+    @Deprecated('Ignored: the workspace setting (Dashboard Settings -> iPhone installs) decides at runtime.')
     this.clipboardBoost = false,
     StraitClipboard? clipboard,
   })  : _clipboard = clipboard,
@@ -355,6 +361,9 @@ class StraitLinks {
       return r;
     }
 
+    // The workspace's live paste-handoff choice, from this check's /v1/match
+    // reply only (never stored; the next check asks again).
+    var pasteOn = false;
     // Signal matching (B7 referrer / B8 match). Returns the event, not emitted.
     Future<LinkEvent> signal() async {
       if (platform == 'android') {
@@ -392,6 +401,7 @@ class StraitLinks {
         ...tag,
       });
       final matched = r.json['matched'] == true;
+      pasteOn = pasteHandoffOn(r.json);
       if (record && matched) _noteTap(replyClickId(r.json['clickId']), t0);
       final dest = _destination(matched ? _str(r.json['longUrl']) : null);
       return LinkEvent(
@@ -414,10 +424,12 @@ class StraitLinks {
         ms: _now() - t0, at: t0,
       );
     }
-    // B19: device matching first; the clipboard only when it found nothing,
-    // only when the app opted in, on iOS, on the once-per-install check (never
-    // the debug re-check). Same openId across both attempts, one event.
-    if (result.matched || !(record && clipboardBoost && platform == 'ios' && _clipboard != null)) {
+    // B19: device matching first; the clipboard only when the engine answered
+    // with no match AND the workspace has Paste handoff on (reply.ios), on
+    // iOS, on the once-per-install check (never the debug re-check). No answer
+    // = the choice is unknown: the clipboard stays untouched and the check
+    // runs again next launch. Same openId across both attempts, one event.
+    if (result.matched || !(record && pasteOn && platform == 'ios' && _clipboard != null)) {
       return _emit(result);
     }
     final token = await _handoffToken();

@@ -5,8 +5,11 @@ import 'package:http/testing.dart';
 import 'package:strait_sdk/strait_sdk.dart';
 import 'package:test/test.dart';
 
-/// Contract B19: the iPhone clipboard boost is opt-in, and the SDK never
-/// touches the clipboard unless the app turned it on.
+/// Contract B19: the iPhone paste handoff is the customer's choice in the
+/// dashboard, read live from the engine's /v1/match reply (`ios`) on every
+/// check. The SDK never touches the clipboard unless that reply says
+/// `pasteHandoff: true` and found no match. The old `clipboardBoost` flag is
+/// ignored.
 const pk = 'st_pub_test_appowner01';
 const endpoint = 'https://hilltop.links.test';
 const token = 'AbCdEfGhIjKlMnOpQrStUv';
@@ -58,7 +61,52 @@ const claimed = {
   'clickId': '3f2a9c1e-7b4d-4e8a-9c0f-1a2b3c4d5e6f',
   'matchMethod': 'clipboard',
 };
-const noMatch = {'matched': false, 'matchMethod': 'none'};
+/// Paste handoff on (device matching on too, found nothing).
+const noMatch = {
+  'matched': false,
+  'matchMethod': 'none',
+  'ios': {'deviceMatching': true, 'pasteHandoff': true},
+};
+/// An older engine: no `ios` field.
+const noMatchOldEngine = {'matched': false, 'matchMethod': 'none'};
+const offOff = {
+  'matched': false,
+  'matchMethod': 'none',
+  'reasons': ['device_matching_off'],
+  'ios': {'deviceMatching': false, 'pasteHandoff': false},
+};
+const deviceOnlyNoMatch = {
+  'matched': false,
+  'matchMethod': 'none',
+  'reasons': ['no_candidate'],
+  'ios': {'deviceMatching': true, 'pasteHandoff': false},
+};
+const deviceMatched = {
+  'matched': true,
+  'longUrl': 'https://shop.example/p/7',
+  'linkId': 'lnk_7',
+  'matchMethod': 'exact_ext',
+  'ios': {'deviceMatching': true, 'pasteHandoff': false},
+};
+const pasteOnly = {
+  'matched': false,
+  'matchMethod': 'none',
+  'reasons': ['device_matching_off'],
+  'ios': {'deviceMatching': false, 'pasteHandoff': true},
+};
+const bothMatched = {
+  'matched': true,
+  'longUrl': 'https://shop.example/p/7',
+  'linkId': 'lnk_7',
+  'matchMethod': 'exact_ext',
+  'ios': {'deviceMatching': true, 'pasteHandoff': true},
+};
+const bothNoMatch = {
+  'matched': false,
+  'matchMethod': 'none',
+  'reasons': ['no_candidate'],
+  'ios': {'deviceMatching': true, 'pasteHandoff': true},
+};
 
 StraitLinks make(Engine e, {SpyClipboard? clip, bool boost = false, String platform = 'ios', KeyValueStore? storage}) =>
     StraitLinks(
@@ -69,14 +117,15 @@ StraitLinks make(Engine e, {SpyClipboard? clip, bool boost = false, String platf
       storage: storage ?? MemoryStore(),
       client: e.client,
       now: () => 1000000,
+      // ignore: deprecated_member_use_from_same_package
       clipboardBoost: boost,
       clipboard: clip,
     );
 
 void main() {
-  test('default: the clipboard is never touched (start + checkDeferred)', () async {
+  test('older engine (no ios field): the clipboard is never touched (start + checkDeferred)', () async {
     final clip = SpyClipboard();
-    final e = Engine({'/v1/match': noMatch, '/v1/handoff/claim': claimed});
+    final e = Engine({'/v1/match': noMatchOldEngine, '/v1/handoff/claim': claimed});
     final s = make(e, clip: clip);
     await s.start();
     await s.checkDeferred();
@@ -85,14 +134,14 @@ void main() {
     expect(e.paths, isNot(contains('/v1/handoff/claim')));
   });
 
-  test('boost on but not iOS: the clipboard is never touched', () async {
+  test('paste handoff on but not iOS: the clipboard is never touched', () async {
     final clip = SpyClipboard();
     final s = make(Engine({'/v1/match': noMatch}), clip: clip, boost: true, platform: 'android');
     await s.start();
     expect(clip.detects + clip.reads, 0);
   });
 
-  test('boost on: the debug checkDeferred never touches the clipboard', () async {
+  test('paste handoff on: the debug checkDeferred never touches the clipboard', () async {
     final clip = SpyClipboard();
     final s = make(Engine({'/v1/match': noMatch}), clip: clip, boost: true, storage: MemoryStore()..data['strait.deferredChecked'] = '1');
     await s.start();
@@ -100,27 +149,27 @@ void main() {
     expect(clip.detects + clip.reads, 0);
   });
 
-  test('boost on, no web URL detected: readText is never called', () async {
+  test('paste handoff on, no web URL detected: readText is never called', () async {
     final clip = SpyClipboard(probable: false);
     final e = Engine({'/v1/match': noMatch});
-    await make(e, clip: clip, boost: true).start();
+    await make(e, clip: clip).start();
     expect(clip.detects, 1);
     expect(clip.reads, 0);
     expect(e.paths, ['/v1/match']);
   });
 
-  test('boost on, clipboard holds another URL: no claim, signal match runs', () async {
+  test('paste handoff on, clipboard holds another URL: no claim, signal match runs', () async {
     final clip = SpyClipboard(text: 'https://evil.example/h/$token');
     final e = Engine({'/v1/match': noMatch});
-    await make(e, clip: clip, boost: true).start();
+    await make(e, clip: clip).start();
     expect(clip.reads, 1);
     expect(e.paths, ['/v1/match']);
   });
 
-  test('boost on, handoff link: exact claim, route clipboard, tap remembered (B16)', () async {
+  test('paste handoff on, handoff link: exact claim, route clipboard, tap remembered (B16)', () async {
     final storage = MemoryStore();
     final e = Engine({'/v1/handoff/claim': claimed, '/v1/match': noMatch});
-    final s = make(e, clip: SpyClipboard(), boost: true, storage: storage);
+    final s = make(e, clip: SpyClipboard(), storage: storage);
     await s.start();
     await Future<void>.delayed(Duration.zero);
     expect(e.paths, ['/v1/match', '/v1/handoff/claim']); // device matching first
@@ -145,9 +194,9 @@ void main() {
     final clip = SpyClipboard();
     final e = Engine({
       '/v1/handoff/claim': claimed,
-      '/v1/match': {'matched': true, 'longUrl': 'https://shop.example/p/7', 'linkId': 'lnk_7'},
+      '/v1/match': bothMatched,
     });
-    final s = make(e, clip: clip, boost: true);
+    final s = make(e, clip: clip);
     await s.start();
     expect(e.paths, ['/v1/match']);
     expect(clip.detects + clip.reads, 0);
@@ -155,14 +204,16 @@ void main() {
     expect(s.events.single.matched, isTrue);
   });
 
-  test('device match fails (5xx): still tries the clipboard', () async {
+  test('no answer from /v1/match (5xx): the choice is unknown, the clipboard stays untouched, network, retried next launch', () async {
     final storage = MemoryStore();
+    final clip = SpyClipboard();
     final e = Engine({'/v1/handoff/claim': claimed}, status: {'/v1/match': 503});
-    final s = make(e, clip: SpyClipboard(), boost: true, storage: storage);
+    final s = make(e, clip: clip, boost: true, storage: storage);
     await s.start();
-    expect(e.paths, ['/v1/match', '/v1/handoff/claim']);
-    expect(s.events.single.route, LinkRoute.clipboard);
-    expect(storage.data['strait.deferredChecked'], '1');
+    expect(e.paths, ['/v1/match']);
+    expect(clip.detects + clip.reads, 0);
+    expect(s.events.single.reason, 'network');
+    expect(storage.data['strait.deferredChecked'], isNull);
   });
 
   test('claim refused (used/expired): keeps the device match result, same openId', () async {
@@ -170,7 +221,7 @@ void main() {
       '/v1/handoff/claim': {'matched': false, 'reason': 'handoff_used'},
       '/v1/match': noMatch,
     });
-    final s = make(e, clip: SpyClipboard(), boost: true);
+    final s = make(e, clip: SpyClipboard());
     await s.start();
     expect(e.paths, ['/v1/match', '/v1/handoff/claim']);
     expect(e.body('/v1/match')!['openId'], e.body('/v1/handoff/claim')!['openId']);
@@ -181,7 +232,7 @@ void main() {
   test('claim unanswered (5xx): network, checked again next launch', () async {
     final storage = MemoryStore();
     final e = Engine({'/v1/match': noMatch}, status: {'/v1/handoff/claim': 503});
-    final s = make(e, clip: SpyClipboard(), boost: true, storage: storage);
+    final s = make(e, clip: SpyClipboard(), storage: storage);
     await s.start();
     expect(s.events.single.reason, 'network');
     expect(storage.data['strait.deferredChecked'], isNull);
@@ -189,9 +240,124 @@ void main() {
 
   test('a throwing clipboard adapter never breaks the deferred check', () async {
     final e = Engine({'/v1/match': noMatch});
-    final s = make(e, clip: SpyClipboard(throws: true), boost: true);
+    final s = make(e, clip: SpyClipboard(throws: true));
     await s.start();
     expect(e.paths, ['/v1/match']);
+  });
+
+  group('the four dashboard combinations (founder decision 10 Oct 2026)', () {
+    test('off / off: no clipboard, no claim, no_match', () async {
+      final clip = SpyClipboard();
+      final e = Engine({'/v1/match': offOff, '/v1/handoff/claim': claimed});
+      final s = make(e, clip: clip);
+      await s.start();
+      expect(e.paths, ['/v1/match']); // the install is still counted
+      expect(clip.detects + clip.reads, 0);
+      expect(s.events.single.matched, isFalse);
+      expect(s.events.single.reason, 'no_match');
+    });
+
+    test('device matching only, matched: fingerprint event, clipboard untouched', () async {
+      final clip = SpyClipboard();
+      final e = Engine({'/v1/match': deviceMatched, '/v1/handoff/claim': claimed});
+      final s = make(e, clip: clip);
+      await s.start();
+      expect(e.paths, ['/v1/match']);
+      expect(clip.detects + clip.reads, 0);
+      expect(s.events.single.route, LinkRoute.fingerprint);
+      expect(s.events.single.matched, isTrue);
+      expect(s.events.single.path, '/p/7');
+    });
+
+    test('device matching only, no match: clipboard untouched, no_match', () async {
+      final clip = SpyClipboard();
+      final e = Engine({'/v1/match': deviceOnlyNoMatch, '/v1/handoff/claim': claimed});
+      final s = make(e, clip: clip);
+      await s.start();
+      expect(e.paths, ['/v1/match']);
+      expect(clip.detects + clip.reads, 0);
+      expect(s.events.single.reason, 'no_match');
+    });
+
+    test('paste handoff only: reads the clipboard, claims with the same openId, route clipboard', () async {
+      final clip = SpyClipboard();
+      final e = Engine({'/v1/match': pasteOnly, '/v1/handoff/claim': claimed});
+      final s = make(e, clip: clip);
+      await s.start();
+      expect(e.paths, ['/v1/match', '/v1/handoff/claim']);
+      expect(clip.detects, 1);
+      expect(clip.reads, 1);
+      expect(e.body('/v1/handoff/claim')!['openId'], e.body('/v1/match')!['openId']);
+      expect(s.events.single.route, LinkRoute.clipboard);
+      expect(s.events.single.matched, isTrue);
+    });
+
+    test('both, device match found: clipboard untouched (no paste prompt)', () async {
+      final clip = SpyClipboard();
+      final e = Engine({'/v1/match': bothMatched, '/v1/handoff/claim': claimed});
+      final s = make(e, clip: clip);
+      await s.start();
+      expect(e.paths, ['/v1/match']);
+      expect(clip.detects + clip.reads, 0);
+      expect(s.events.single.route, LinkRoute.fingerprint);
+    });
+
+    test('both, no device match: paste fallback claims it', () async {
+      final clip = SpyClipboard();
+      final e = Engine({'/v1/match': bothNoMatch, '/v1/handoff/claim': claimed});
+      final s = make(e, clip: clip);
+      await s.start();
+      expect(e.paths, ['/v1/match', '/v1/handoff/claim']);
+      expect(s.events.single.route, LinkRoute.clipboard);
+      expect(s.events.single.matched, isTrue);
+    });
+
+    test('the deprecated clipboardBoost flag is ignored both ways', () async {
+      // true + older engine (no ios field): untouched.
+      var clip = SpyClipboard();
+      var e = Engine({'/v1/match': noMatchOldEngine, '/v1/handoff/claim': claimed});
+      await make(e, clip: clip, boost: true).start();
+      expect(clip.detects + clip.reads, 0);
+      expect(e.paths, ['/v1/match']);
+      // true + paste off in the dashboard: untouched.
+      clip = SpyClipboard();
+      e = Engine({'/v1/match': deviceOnlyNoMatch, '/v1/handoff/claim': claimed});
+      await make(e, clip: clip, boost: true).start();
+      expect(clip.detects + clip.reads, 0);
+      // false + paste on in the dashboard: claimed (no app release needed).
+      clip = SpyClipboard();
+      e = Engine({'/v1/match': pasteOnly, '/v1/handoff/claim': claimed});
+      final s = make(e, clip: clip, boost: false);
+      await s.start();
+      expect(s.events.single.route, LinkRoute.clipboard);
+    });
+
+    test('nothing is stored: two fresh installs follow their own live replies', () async {
+      final storage = MemoryStore();
+      final clipA = SpyClipboard();
+      final a = Engine({'/v1/match': offOff, '/v1/handoff/claim': claimed});
+      await make(a, clip: clipA, storage: storage).start();
+      expect(clipA.detects + clipA.reads, 0);
+      expect(storage.data.keys.where((k) => k.toLowerCase().contains('paste') || k.contains('ios')), isEmpty);
+      // The customer turns Paste handoff on; the next install (fresh storage) follows.
+      final clipB = SpyClipboard();
+      final b = Engine({'/v1/match': pasteOnly, '/v1/handoff/claim': claimed});
+      final s = make(b, clip: clipB, storage: MemoryStore());
+      await s.start();
+      expect(clipB.reads, 1);
+      expect(s.events.single.route, LinkRoute.clipboard);
+    });
+
+    test('pasteHandoffOn reads only an unmatched reply with ios.pasteHandoff true', () {
+      expect(pasteHandoffOn(pasteOnly), isTrue);
+      expect(pasteHandoffOn(bothNoMatch), isTrue);
+      expect(pasteHandoffOn(bothMatched), isFalse);
+      expect(pasteHandoffOn(offOff), isFalse);
+      expect(pasteHandoffOn(deviceOnlyNoMatch), isFalse);
+      expect(pasteHandoffOn(noMatchOldEngine), isFalse);
+      expect(pasteHandoffOn({'matched': false, 'ios': {'pasteHandoff': 'true'}}), isFalse);
+      expect(pasteHandoffOn(null), isFalse);
+    });
   });
 
   group('claimHandoff (paste button)', () {

@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- iPhone deferred method is the customer's choice, at runtime (founder decision 10 Oct 2026):
+  the SDK tries the paste handoff only when the engine's `/v1/match` reply has no match and
+  says `ios.pasteHandoff: true` (Dashboard → Settings → iPhone installs). Nothing is stored or
+  baked into the build, so a dashboard change needs no app release. No answer from the engine
+  = the clipboard stays untouched (`network`, retried next launch). An older engine without
+  the `ios` field = off. New `pasteHandoffOn(reply)` helper. `clipboardBoost` is deprecated
+  and ignored. Tests cover off/off, device only, paste only and both. New workspaces start
+  with device matching off.
 - Clipboard boost order (B19): the first-launch iPhone check now runs device matching
   (`/v1/match`) first and reads the clipboard / claims the handoff only when it returns no
   match or fails. A device match no longer shows iOS's "Allow Paste" prompt. Same `openId`
