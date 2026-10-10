@@ -25,7 +25,7 @@ class MemoryStore implements KeyValueStore {
   Future<void> set(String key, String value) async => data[key] = value;
 }
 
-/// The app's clipboard, for the iPhone clipboard boost (contract B19). Pure
+/// The app's clipboard, for the iPhone paste handoff (contract B19). Pure
 /// Dart can't reach UIPasteboard, so the app supplies this (see README for a
 /// MethodChannel version). Used on iOS, once per install, only when the
 /// workspace turned on Paste handoff in the dashboard and device matching

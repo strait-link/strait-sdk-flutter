@@ -6,7 +6,7 @@
 ///  2. Android: Google Play inline install, then market://, then the Play web
 ///     page, each with referrer=strait_link=<id>&strait_click=<tap>.
 ///     iPhone: save this device's match fields for the tap (/v1/match-save),
-///     optionally copy the clipboard-boost handoff link, then show the App Store.
+///     optionally copy the paste-handoff link, then show the App Store.
 ///
 /// Pure Dart can't start an Intent or show StoreKit, so the app supplies a
 /// [StoreSheetOpener] (README "Store sheet" has a MethodChannel version).

@@ -7,9 +7,13 @@
 
 Deep linking for Flutter: verified links and custom schemes open the right
 screen, and deferred links survive the install (the user taps your link,
-installs the app, and lands on the right screen). On iPhone it matches by
-default without touching the clipboard; an optional clipboard boost gives an
-exact match for apps that turn it on (see below).
+installs the app, and lands on the right screen). On iPhone the method is
+your choice in Dashboard → Settings → iPhone installs (device matching, paste
+handoff, both, or neither), read from Strait at runtime; device matching is off
+by default for new workspaces, and iPhone install matching is in beta (see below).
+
+**Straight to the screen. On the record.** A tap opens the exact screen, and
+each link open and install is recorded in your Strait dashboard.
 
 Part of [Strait](https://straitlink.in). The match signature is a Dart port of
 the shared Strait signature recipe and is checked against the **same golden vectors**
@@ -88,7 +92,7 @@ Future<StraitLinks> startStrait() async {
   final strait = StraitLinks(
     publishableKey: 'st_pub_live_…', // Dashboard → Get started
     endpoint: 'https://<your-handle>.strait.link',
-    linkHosts: const ['links.yourbrand.com'], // extra custom domains, if any
+    linkHosts: const ['links.yourbrand.com'], // extra custom domains (coming soon), if any
     platform: Platform.isIOS ? 'ios' : Platform.isAndroid ? 'android' : 'other',
     storage: PrefsStore(await SharedPreferences.getInstance()),
     installReferrer: () async =>
@@ -218,8 +222,8 @@ shows `SKStoreProductViewController` or `SKOverlay` (sdk-swift's
   with `referrer=strait_link=<id>&strait_click=<tap>`. The installed app's Play
   Install Referrer match reads it exactly.
 - **iPhone:** saves this device's match fields for the tap (unless the workspace
-  turned iPhone install matching off), copies the clipboard-boost handoff link
-  with `copyHandoffLink: true` (override `writeClipboard`), then shows the App
+  turned iPhone install matching off), copies the paste-handoff link
+  with `copyHandoffLink: true` (when the workspace's paste handoff is on) (override `writeClipboard`), then shows the App
   Store with the link's campaign as the `ct` token.
 
 The tap is recorded with `sent_to = store_sheet` and is not billed during the
@@ -266,11 +270,11 @@ tap id, `strait.lastTap`, `eventClickId`) · B16 (the tap id from the
 `/v1/resolve`, `/v1/match` and `/v1/referrer` replies, `replyClickId`) · B17
 (portrait screen width, `portraitScreenWidth`) · B18 (reported and queued URLs
 carry no query or fragment except `utm_source`, `reportUrl`; expired remembered
-taps are deleted, `staleTap`) · B19 (opt-in iPhone clipboard boost,
+taps are deleted, `staleTap`) · B19 (iPhone paste handoff, chosen in the dashboard at runtime,
 `parseHandoffUrl`, `/v1/handoff/claim`, `claimHandoff`). Both shared vector
 files (conformance v7) are asserted in `dart test`.
 
-## iPhone deferred links: you choose the method (B19)
+## iPhone deferred links (beta): you choose the method (B19)
 
 How iPhone install matching works, what it uses and how long it is kept:
 https://straitlink.in/docs/iphone-install-matching/

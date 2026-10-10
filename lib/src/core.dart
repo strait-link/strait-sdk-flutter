@@ -353,7 +353,7 @@ class AppStateTracker {
   }
 }
 
-/// A clipboard-boost handoff token as the tap page mints it: 128 random bits,
+/// A paste-handoff token as the tap page mints it: 128 random bits,
 /// base64url (contract B19).
 final _handoffToken = RegExp(r'^[A-Za-z0-9_-]{22}$');
 final _handoffUrl =

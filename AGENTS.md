@@ -115,7 +115,7 @@ https://straitlink.in/docs/troubleshooting/.
   `shared-spec/scripts/rename-brand.sh` (all SDKs) or `node scripts/brand.mjs --write`.
 - Wire names are part of the contract: query params `strait_click` / `strait_link`, storage keys `strait.*`,
   headers `X-Strait-*`. Don't rename them.
-- Brand: Strait (never "Straight"). Don't write superlatives ("best", "cheapest") or speed / match-rate numbers in
+- Brand: the name is spelled Strait (never "Straight"; the tagline "Straight to the screen. On the record." is fine). Don't write superlatives ("best", "cheapest") or speed / match-rate numbers in
   docs or comments. iPhone install matching is in beta.
 
 ## Support
