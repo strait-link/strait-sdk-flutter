@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.8.3
+
+- `checkDeferred()` (the debug / settings re-check) now sends `"record": false` on `/v1/match` and `/v1/referrer`, so the
+  engine answers the match without adding an install, an open or an `install.matched` webhook
+  (contract B6: it never adds an install). The once-per-install check is unchanged. Takes effect
+  once the engine with `record` support is live; an older engine ignores the field.
+- Every request to the engine now gives up after 10 s (like the Android SDK's timeouts) and takes
+  the existing `network` path: the deferred check is retried next launch and open reports stay
+  queued. Before, a reply that never came hung `start()` and the open-report queue.
+
 ## 0.8.2
 
 - First version on pub.dev. `v0.8.1` is a GitHub tag only and was never uploaded, so pub.dev

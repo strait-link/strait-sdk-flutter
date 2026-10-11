@@ -348,11 +348,12 @@ class StraitLinks {
   Future<LinkEvent> checkDeferred() => _runDeferred(false);
 
   /// The deferred check. [record] (the once-per-install run) sends the openId
-  /// so the engine records this first open + install exactly once.
+  /// so the engine records this first open + install exactly once; the debug
+  /// re-check sends record:false instead, so the engine adds no install.
   Future<LinkEvent> _runDeferred(bool record) async {
     final t0 = _now();
     final id = newOpenId(t0);
-    final tag = record ? {'openId': id, 'at': t0} : const <String, Object>{};
+    final tag = record ? {'openId': id, 'at': t0} : const <String, Object>{'record': false};
     _announce(LinkStart(id: id, kind: LinkKind.deferred, appState: AppStateAtLink.closed, at: t0));
     // No answer, 429 or 5xx = try again next launch (reported as 'network').
     Future<_Res> answered(String path, Map<String, dynamic> body) async {
@@ -720,10 +721,13 @@ class StraitLinks {
 
   Future<_Res> _call(String method, String path, [Map<String, dynamic>? body]) async {
     final uri = Uri.parse('$_base$path');
-    final res = body == null
-        ? await _http.get(uri)
-        : await _http.post(uri,
-            headers: {'Content-Type': 'application/json'}, body: jsonEncode(body));
+    // A stalled reply must not hang start() or the open queue: like the Android
+    // SDK's 10 s timeouts, it throws into the existing 'network' path.
+    final res = await (body == null
+            ? _http.get(uri)
+            : _http.post(uri,
+                headers: {'Content-Type': 'application/json'}, body: jsonEncode(body)))
+        .timeout(const Duration(seconds: 10));
     Map<String, dynamic> json;
     try {
       final d = jsonDecode(res.body);

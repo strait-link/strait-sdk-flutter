@@ -478,6 +478,40 @@ void main() {
       expect(engine.of('/v1/match'), hasLength(1));
       expect(engine.of('/v1/match')[0].body!.containsKey('openId'), isFalse);
       expect(engine.of('/v1/match')[0].body!.containsKey('at'), isFalse);
+      expect(engine.of('/v1/match')[0].body!['record'], false);
+    });
+
+    test('the debug re-check sends record:false on /v1/referrer too; the first-launch check never does',
+        () async {
+      final engine = FakeEngine({
+        '/v1/referrer': const Reply(
+            200, {'matched': true, 'longUrl': 'https://shop.example/p/42', 'linkId': 'lnk_42'})
+      });
+      final h = make(FakePhone(referrer: 'strait_link=lnk_42'), engine);
+      await h.start();
+      await h.strait.checkDeferred();
+      final calls = engine.of('/v1/referrer');
+      expect(calls, hasLength(2));
+      expect(calls[0].body!.containsKey('record'), isFalse);
+      expect(calls[0].body!.containsKey('openId'), isTrue);
+      expect(calls[1].body!['record'], false);
+      expect(calls[1].body!.containsKey('openId'), isFalse);
+    });
+
+    test('a request the engine never answers times out after 10 s and counts as network',
+        () async {
+      // Fire the SDK's 10 s timer at once (and note it) instead of waiting 10 real seconds.
+      final timers = <Duration>[];
+      final spec = ZoneSpecification(createTimer: (self, parent, zone, d, f) {
+        timers.add(d);
+        return parent.createTimer(zone, d == const Duration(seconds: 10) ? Duration.zero : d, f);
+      });
+      final storage = MemoryStore();
+      final h = make(FakePhone(), FakeEngine({'/v1/match': hang}), storage);
+      await runZoned(() => h.start(), zoneSpecification: spec);
+      expect(timers, contains(const Duration(seconds: 10)));
+      expect(h.events[0].reason, 'network');
+      expect(storage.data['strait.deferredChecked'], isNull);
     });
 
     test('unreadable storage = already checked (no deferred jump); write failures never throw',
