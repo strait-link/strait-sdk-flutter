@@ -494,6 +494,67 @@ void main() {
       expect(eventBody(h.engine)!.containsKey('clickId'), isFalse);
     });
   });
+  group('old Firebase page.link links (B22)', () {
+    Harness makePageLink(FakeEngine engine) {
+      final p = FakePhone();
+      return Harness(
+        p,
+        engine,
+        StraitLinks(
+          publishableKey: pk,
+          endpoint: endpoint,
+          linkHosts: const ['acme.page.link'],
+          platform: 'android',
+          deviceFields: () => device,
+          storage: MemoryStore(),
+          installReferrer: () async => null,
+          client: engine.client,
+          now: () => p.t,
+        ),
+      );
+    }
+
+    test('a page.link short link is resolved by the engine (host + code sent)', () async {
+      final h = makePageLink(FakeEngine({
+        '/v1/resolve': {
+          'matched': true,
+          'longUrl': 'https://shop.example/p/7',
+          'linkId': 'lnk_7',
+          'slug': 'aBcD',
+          'recorded': true
+        }
+      }));
+      await h.start(initialUrl: 'https://acme.page.link/aBcD');
+      await flush();
+      expect(h.engine.find('/v1/resolve')!.body!['url'], 'https://acme.page.link/aBcD');
+      final e = h.events.single;
+      expect(e.route, LinkRoute.appLink);
+      expect(e.matched, isTrue);
+      expect(e.url, 'https://shop.example/p/7');
+      expect(e.linkId, 'lnk_7');
+    });
+
+    test('a page.link long link opens its link= destination with no lookup', () async {
+      final h = makePageLink(FakeEngine({
+        '/v1/open': {'ok': true}
+      }));
+      await h.start(
+          initialUrl:
+              'https://acme.page.link/?link=https%3A%2F%2Fshop.example%2Fp%2F42%3Fcolor%3Dred&apn=com.acme.app');
+      await flush();
+      await flush();
+      final e = h.events.first;
+      expect(e.route, LinkRoute.appLink);
+      expect(e.matched, isTrue);
+      expect(e.url, 'https://shop.example/p/42?color=red');
+      expect(e.path, '/p/42');
+      expect(e.params, {'color': 'red'});
+      expect(h.engine.calls.where((c) => c.path == '/v1/resolve'), isEmpty);
+      final open = h.engine.find('/v1/open')!.body!;
+      expect(open['url'], 'https://shop.example/p/42');
+      expect(open['matched'], isTrue);
+    });
+  });
 }
 
 class _BrokenStore implements KeyValueStore {

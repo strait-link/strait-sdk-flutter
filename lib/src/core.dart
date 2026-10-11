@@ -178,8 +178,25 @@ class ClassifiedUrl {
       [this.clickId]);
 }
 
-/// What a URL handed to the app means (B3, B4):
-/// - https on a Strait link host → a short link; ask /v1/resolve.
+/// The deep link inside an old Firebase Dynamic Links long link (contract B22):
+/// `https://<x>.page.link/?link=<url>&…` → `<url>`. Only on a `*.page.link`
+/// host, only at the root path, only when `link` is an absolute http(s) URL with
+/// a host. Anything else → null (a page.link short link is resolved by the engine).
+String? pageLinkLongLink(SplitUrl p) {
+  if (!p.host.endsWith('.page.link') || (p.path != '/' && p.path != '')) return null;
+  final link = p.params['link'];
+  if (link == null || link.isEmpty) return null;
+  final inner = splitUrl(link);
+  if (inner == null || (inner.scheme != 'https' && inner.scheme != 'http') || inner.host.isEmpty) {
+    return null;
+  }
+  return link.trim();
+}
+
+/// What a URL handed to the app means (B3, B4, B22):
+/// - https on a Strait link host → a short link; ask /v1/resolve. Except an
+///   FDL long link on a `*.page.link` link host (B22): its `link=` value IS the
+///   destination, read on the device with no network call.
 /// - other https → it IS the destination.
 /// - yourapp://host/path (browser hand-off) → destination https://host/path.
 /// A `strait_click` tap id is removed from the destination and returned apart.
@@ -189,6 +206,14 @@ ClassifiedUrl? classifyUrl(String raw, List<String> linkHosts) {
   if (p0 == null) return null;
   final isWeb = p0.scheme == 'https' || p0.scheme == 'http';
   if (isWeb && linkHosts.map((h) => h.toLowerCase()).contains(p0.host)) {
+    final long = pageLinkLongLink(p0);
+    if (long != null) {
+      final inner = classifyUrl(long, const []);
+      if (inner != null && !inner.needsResolve) {
+        return ClassifiedUrl._(
+            LinkRoute.appLink, false, inner.url, inner.path, inner.params, inner.clickId);
+      }
+    }
     return const ClassifiedUrl._(LinkRoute.appLink, true, null, null, null);
   }
   final t = takeClickId(raw);

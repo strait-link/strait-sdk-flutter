@@ -36,6 +36,13 @@
 - Demo names: test and doc hosts move to reserved names (`hilltop.links.test`,
   `go.hilltop.example`, `jo@hilltop.example`); `conformance-vectors.json` re-copied from
   shared-spec 11779b1 (inputs renamed, every expected value unchanged).
+- Old Firebase Dynamic Links (shared-spec/SDK-CONTRACT.md B22, conformance vectors v8). Add your
+  `<x>.page.link` host to `linkHosts` (and keep `applinks:<x>.page.link` / the page.link intent filter in
+  your app build): a page.link **short** link is looked up through `/v1/resolve` like any short link (the
+  engine matches the old host + code of links you imported), and a page.link **long** link
+  (`https://<x>.page.link/?link=<url>&…`) opens its `link=` destination straight away, on the device, with no
+  lookup. Only `*.page.link` hosts at the root path, only an http(s) `link`. New core function
+  `pageLinkLongLink`. Not yet tested on a real iPhone.
 
 ## 0.8.1
 
