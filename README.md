@@ -39,8 +39,8 @@ by default for new workspaces, and iPhone install matching is in beta (see below
 
 Part of [Strait](https://straitlink.in). The match signature is a Dart port of
 the shared Strait signature recipe and is checked against the **same golden vectors**
-as the server, web, and React Native SDKs (run by `dart test` in CI), so the
-signature can never drift across languages.
+as the server, web, and React Native SDKs (run by `dart test` in CI), so a
+signature that drifts from the other languages fails the build.
 
 ## Platform features
 
@@ -121,7 +121,7 @@ class LifecycleFeed with WidgetsBindingObserver {
 
 Future<StraitLinks> startStrait() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final timezone = await FlutterTimezone.getLocalTimezone(); // IANA, e.g. Asia/Kolkata
+  final timezone = (await FlutterTimezone.getLocalTimezone()).identifier; // IANA, e.g. Asia/Kolkata
   final strait = StraitLinks(
     publishableKey: 'st_pub_live_…', // Dashboard → Get started
     endpoint: 'https://<your-handle>.strait.link',
@@ -175,7 +175,8 @@ Notes:
 - Fingerprint debug: `strait.reportFingerprint()` then `strait.compareFingerprint()`.
 - `strait.checkDeferred()` re-runs the deferred check (debugging); it doesn't
   touch the once-per-install flag and never records an install.
-- `flutter_timezone` 4.x returns a `TimezoneInfo`; use `.identifier`.
+- `flutter_timezone` 5.0 and later returns a `TimezoneInfo` (hence `.identifier`);
+  4.x and earlier return the `String` itself, so drop `.identifier` there.
 
 ### Old Firebase page.link links (contract B22)
 
@@ -368,8 +369,9 @@ short-lived, single-use Strait link (`https://<your link host>/h/<token>`,
    the clipboard is left alone and the check runs again on the next launch;
 1. asks iOS, **without a prompt**, whether the clipboard probably holds a web
    URL (`UIPasteboard.detectPatterns(for: [.probableWebURL])`, iOS 15+);
-2. only if it does, reads the text. **iOS shows its "Allow Paste" prompt here.**
-   If the person taps Don't Allow, nothing is read;
+2. only if it does, reads the text. **On iOS 16 and later, iOS shows its "Allow
+   Paste" prompt here** (iOS 15 reads without asking and shows a "pasted from"
+   notice). If the person taps Don't Allow, nothing is read;
 3. keeps it only if it is a Strait handoff link for your link hosts
    (`parseHandoffUrl`); anything else never leaves the device;
 4. claims it (`POST /v1/handoff/claim`) for an exact match, else keeps the
