@@ -74,7 +74,7 @@ const androidReply = {
 };
 Map<String, Object> iosReply([Map<String, Object?> extra = const {}]) => {
       'ok': true, 'beta': true, 'clickId': click, 'linkId': 'lnk_42',
-      'ios': {'appStoreId': '6474676842', 'campaignToken': 'autumn-sale', 'deviceMatching': true, 'handoffUrl': null, ...extra},
+      'ios': {'appStoreId': '1234567890', 'campaignToken': 'autumn-sale', 'deviceMatching': true, 'handoffUrl': null, ...extra},
     };
 
 void main() {
@@ -148,7 +148,7 @@ void main() {
       expect(r.opened, isTrue);
       expect(r.method, 'product_page');
       expect(r.matchSaved, isTrue);
-      expect(o.products.single.$1, const StoreProduct('6474676842', campaignToken: 'autumn-sale'));
+      expect(o.products.single.$1, const StoreProduct('1234567890', campaignToken: 'autumn-sale'));
       expect(e.body('/v1/match-save'), {...device.toJson(), 'linkId': 'lnk_42', 'clickId': click});
     });
 
