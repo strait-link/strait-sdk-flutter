@@ -1,5 +1,33 @@
 # Publishing to pub.dev
 
+## Where this stands (12 Oct 2026)
+
+- `strait_sdk` is not on pub.dev yet (the name is free) and the publisher `straitlink.in` does not
+  exist yet. The repo is public. The repo variable `PUB_DEV_PUBLISHING` is not set, so the
+  v0.8.2 and v0.8.3 release runs passed every check and published nothing, as designed.
+- Tag v0.8.3 (`a51a959`): `dart pub publish --dry-run` gives 0 warnings, 299 tests pass,
+  `brand.mjs --release` is in sync. It is the version to put up first.
+- The founder's steps (about 20 minutes, all by hand, once):
+  1. pub.dev, **Sign in** with the Google account that owns straitlink.in, avatar menu,
+     **Create publisher**, domain `straitlink.in` (already verified in Search Console, so pub.dev
+     only asks to confirm).
+  2. Terminal:
+     ```sh
+     git clone https://github.com/bazingga08/strait-sdk-flutter.git && cd strait-sdk-flutter
+     git checkout v0.8.3
+     dart pub get && dart pub publish --dry-run   # must say 0 warnings
+     dart pub publish                             # browser sign-in, then type y
+     ```
+  3. pub.dev, `strait_sdk`, **Admin**, **Transfer to publisher**, `straitlink.in`.
+  4. Same **Admin** page, **Automated publishing**, **Enable publishing from GitHub Actions**:
+     repository `bazingga08/strait-sdk-flutter`, tag pattern `v{{version}}`, leave
+     "Require GitHub Actions environment" off. **Update**.
+  5. GitHub, strait-sdk-flutter, **Settings**, **Secrets and variables**, **Actions**,
+     **Variables**, **New repository variable**: name `PUB_DEV_PUBLISHING`, value `true`
+     (or `gh variable set PUB_DEV_PUBLISHING --body true -R bazingga08/strait-sdk-flutter`).
+  6. Check: https://pub.dev/packages/strait_sdk shows 0.8.3 and "verified publisher
+     straitlink.in". The next tag (v0.8.4) then publishes from Actions with no secret.
+
 The package name (`<slug>_sdk`), homepage, repository and copyright holder come from
 `brand.json`. Nothing else in this repo types them (`scripts/brand.mjs` also renames
 `lib/<name>.dart` and every `package:<name>/` import when the name changes).
