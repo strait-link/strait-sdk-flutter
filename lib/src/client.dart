@@ -39,6 +39,26 @@ abstract class StraitClipboard {
   Future<String?> readText();
 }
 
+/// [StraitClipboard] over your app's MethodChannel, so the Dart side is one line:
+/// `StraitChannelClipboard(const MethodChannel('strait/clipboard').invokeMethod)`.
+/// The native side answers `hasProbableWebUrl` with
+/// `detectPatterns(for: [.probableWebURL])` (no prompt; true for the plain-text
+/// link the tap page copies, unlike `hasURLs`) and `readText` with the
+/// clipboard string (README, "iPhone: paste handoff").
+class StraitChannelClipboard implements StraitClipboard {
+  final Future<Object?> Function(String method) _invoke;
+  StraitChannelClipboard(this._invoke);
+
+  @override
+  Future<bool> hasProbableWebUrl() async => await _invoke('hasProbableWebUrl') == true;
+
+  @override
+  Future<String?> readText() async {
+    final text = await _invoke('readText');
+    return text is String ? text : null;
+  }
+}
+
 /// direct = the app was opened by a link; deferred = link tapped before install.
 enum LinkKind { direct, deferred }
 

@@ -16,6 +16,18 @@ const token = 'AbCdEfGhIjKlMnOpQrStUv';
 const handoff = 'https://hilltop.links.test/h/$token';
 const device = DeviceFields(screenWidth: 390, pixelRatio: 3, language: 'en-IN', timezone: 'Asia/Kolkata');
 
+/// Same shape as Flutter's MethodChannel.invokeMethod (generic, optional args),
+/// so the tests prove `StraitChannelClipboard(channel.invokeMethod)` compiles.
+class FakeChannel {
+  final Map<String, Object?> replies;
+  final List<String> calls = [];
+  FakeChannel(this.replies);
+  Future<T?> invokeMethod<T>(String method, [dynamic arguments]) async {
+    calls.add(method);
+    return replies[method] as T?;
+  }
+}
+
 class SpyClipboard implements StraitClipboard {
   bool probable;
   String? text;
@@ -108,7 +120,7 @@ const bothNoMatch = {
   'ios': {'deviceMatching': true, 'pasteHandoff': true},
 };
 
-StraitLinks make(Engine e, {SpyClipboard? clip, bool boost = false, String platform = 'ios', KeyValueStore? storage}) =>
+StraitLinks make(Engine e, {StraitClipboard? clip, bool boost = false, String platform = 'ios', KeyValueStore? storage}) =>
     StraitLinks(
       publishableKey: pk,
       endpoint: endpoint,
@@ -357,6 +369,44 @@ void main() {
       expect(pasteHandoffOn(noMatchOldEngine), isFalse);
       expect(pasteHandoffOn({'matched': false, 'ios': {'pasteHandoff': 'true'}}), isFalse);
       expect(pasteHandoffOn(null), isFalse);
+    });
+  });
+
+  // B-SDK-06: the shipped channel adapter. Its native side is the README's
+  // AppDelegate handler: hasProbableWebUrl = detectPatterns(.probableWebURL),
+  // which (iOS 26.5 simulator) is true for the plain-text link the tap page
+  // copies, while hasURLs is false.
+  group('StraitChannelClipboard', () {
+    test('asks hasProbableWebUrl, then readText, on the strait/clipboard methods', () async {
+      final ch = FakeChannel({'hasProbableWebUrl': true, 'readText': handoff});
+      final clip = StraitChannelClipboard(ch.invokeMethod);
+      expect(await clip.hasProbableWebUrl(), isTrue);
+      expect(await clip.readText(), handoff);
+      expect(ch.calls, ['hasProbableWebUrl', 'readText']);
+    });
+
+    test('no answer or a non-bool answer is a no (nothing read, no prompt)', () async {
+      expect(await StraitChannelClipboard(FakeChannel({}).invokeMethod).hasProbableWebUrl(), isFalse);
+      expect(await StraitChannelClipboard(FakeChannel({'hasProbableWebUrl': 'yes'}).invokeMethod).hasProbableWebUrl(), isFalse);
+      expect(await StraitChannelClipboard(FakeChannel({'readText': 42}).invokeMethod).readText(), isNull);
+    });
+
+    test('end to end: paste handoff on, no device match, claims the exact match', () async {
+      final ch = FakeChannel({'hasProbableWebUrl': true, 'readText': handoff});
+      final e = Engine({'/v1/handoff/claim': claimed, '/v1/match': noMatch});
+      final s = make(e, clip: StraitChannelClipboard(ch.invokeMethod));
+      await s.start();
+      await Future<void>.delayed(Duration.zero);
+      expect(e.body('/v1/handoff/claim')!['token'], token);
+      expect(s.events.single.route, LinkRoute.clipboard);
+      expect(s.events.single.matched, isTrue);
+    });
+
+    test('no probable URL: readText is never called (no paste prompt)', () async {
+      final ch = FakeChannel({'hasProbableWebUrl': false, 'readText': handoff});
+      final e = Engine({'/v1/match': noMatch});
+      await make(e, clip: StraitChannelClipboard(ch.invokeMethod)).start();
+      expect(ch.calls, ['hasProbableWebUrl']);
     });
   });
 

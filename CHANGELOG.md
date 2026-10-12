@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- Paste handoff (B19, B-SDK-06): new `StraitChannelClipboard(invoke)`, a `StraitClipboard`
+  over your app's MethodChannel (`const MethodChannel('strait/clipboard').invokeMethod`), so the
+  Dart side is one line and the method names match the README's AppDelegate handler, which
+  answers with `detectPatterns(.probableWebURL)`. A missing or non-bool answer counts as "no"
+  (nothing is read, no prompt). README: why not `hasURLs` (false for the plain-text link the tap
+  page copies; checked on an iOS 26.5 simulator) and a no-native-code option with Flutter's
+  `Clipboard.hasStrings()` and its prompt trade-off.
+
 ## 0.8.3
 
 - `checkDeferred()` (the debug / settings re-check) now sends `"record": false` on `/v1/match` and `/v1/referrer`, so the

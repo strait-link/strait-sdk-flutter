@@ -415,19 +415,27 @@ Dart side:
 import 'package:flutter/services.dart';
 import 'package:strait_sdk/strait_sdk.dart';
 
-class ChannelClipboard implements StraitClipboard {
-  static const _ch = MethodChannel('strait/clipboard');
-  @override
-  Future<bool> hasProbableWebUrl() async =>
-      await _ch.invokeMethod<bool>('hasProbableWebUrl') ?? false;
-  @override
-  Future<String?> readText() => _ch.invokeMethod<String>('readText');
-}
-
 final strait = StraitLinks(
   // …as above…
-  clipboard: ChannelClipboard(), // used only when the dashboard turns Paste handoff on
+  // Used only when the dashboard turns Paste handoff on.
+  clipboard: StraitChannelClipboard(const MethodChannel('strait/clipboard').invokeMethod),
 );
+```
+
+Use `detectPatterns(.probableWebURL)` on the native side, not `hasURLs`: the tap
+page copies the link as plain text, and `hasURLs` is false for plain text.
+
+Without native code, Flutter's own `Clipboard` works too, with a cost: it can't ask
+"is this probably a URL?", only `Clipboard.hasStrings()`, so iOS shows the paste
+prompt whenever any text is on the clipboard:
+
+```dart
+class ServicesClipboard implements StraitClipboard {
+  @override
+  Future<bool> hasProbableWebUrl() => Clipboard.hasStrings(); // no prompt
+  @override
+  Future<String?> readText() async => (await Clipboard.getData(Clipboard.kTextPlain))?.text;
+}
 ```
 
 **Paste button instead of the prompt.** Apple's paste control
