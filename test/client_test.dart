@@ -350,16 +350,19 @@ void main() {
     // that routes home on !matched left the right screen (B6).
     group('a link that arrives while the first-launch check runs wins (B6)', () {
       /// /v1/match held until [gate] completes; other paths answer 202.
+      final bodies = <String, Map<String, dynamic>>{};
       (StraitLinks, FakePhone, List<LinkEvent>, MemoryStore, List<String>) held(
           Completer<void> gate, http.Response Function() matchReply) {
         final phone = FakePhone();
         final storage = MemoryStore();
         final paths = <String>[];
+        bodies.clear();
         final strait = StraitLinks(
           publishableKey: pk, endpoint: endpoint, platform: 'android',
           deviceFields: () => device, storage: storage, installReferrer: () async => null,
           client: MockClient((req) async {
             paths.add(req.url.path);
+            if (req.body.isNotEmpty) bodies[req.url.path] = jsonDecode(req.body) as Map<String, dynamic>;
             if (req.url.path == '/v1/match') {
               await gate.future;
               return matchReply();
@@ -425,6 +428,37 @@ void main() {
         await flush();
         expect(events.map((e) => e.kind), [LinkKind.direct]);
         expect(opening, isFalse);
+      });
+
+      // 13 Oct follow-up: a late deferred *match* would jump from the screen the
+      // person just tapped to a stale pre-install destination.
+      test("the check's late match is not delivered either; install counted, check done", () async {
+        final gate = Completer<void>();
+        final (strait, phone, events, storage, paths) = held(
+            gate,
+            () => http.Response(
+                jsonEncode({'matched': true, 'longUrl': 'https://shop.example/promo/7', 'linkId': 'lnk_7', 'clickId': 'c-7'}),
+                200));
+        var opening = false;
+        strait.onLinkStart.listen((_) => opening = true);
+        strait.onLink.listen((_) => opening = false);
+        final started = strait.start(urls: phone.urls.stream, lifecycle: phone.states.stream);
+        await until(() => paths.contains('/v1/match'));
+        phone.tap('straitlink://shop.example/product/42');
+        await until(() => events.isNotEmpty);
+        gate.complete();
+        await started;
+        await flush();
+        expect(events.map((e) => (e.kind, e.path)), [(LinkKind.direct, '/product/42')]);
+        expect(opening, isFalse);
+        // The engine got this install's openId: it records and attributes the match as before.
+        expect(bodies['/v1/match']!['openId'], isA<String>());
+        expect(bodies['/v1/match']!.containsKey('record'), isFalse);
+        expect(await storage.get('strait.deferredChecked'), '1');
+        expect(strait.events.map((e) => e.kind), [LinkKind.direct]); // not replayed
+        // An explicit checkDeferred() still returns its answer.
+        final again = await strait.checkDeferred();
+        expect((again.kind, again.matched, again.path), (LinkKind.deferred, true, '/promo/7'));
       });
 
       test('with no link this launch, the no-match is still delivered', () async {

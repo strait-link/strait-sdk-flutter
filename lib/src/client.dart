@@ -165,7 +165,7 @@ class StraitLinks {
   final bool clipboardBoost;
   final StraitClipboard? _clipboard;
   bool _firstLaunch = false;
-  /// A direct link arrived in this launch (B6: the check's "no link" then stays quiet).
+  /// A direct link arrived in this launch (B6: the first-launch check then stays quiet).
   bool _directArrived = false;
 
   final _tracker = AppStateTracker();
@@ -358,15 +358,16 @@ class StraitLinks {
     final id = newOpenId(t0);
     final tag = record ? {'openId': id, 'at': t0} : const <String, Object>{'record': false};
     // B6: a link that arrived before or while this once-per-install check ran is
-    // what the person wants now. The check's "no link" answer (no_match or
+    // what the person wants now. The check's answer (a match, no_match or
     // network) is returned but not delivered: it would pull the app off that
-    // link's screen. Nor is a start signal sent once a link is here, since no
-    // event may follow it (a loading state would never end).
+    // link's screen to a stale pre-install destination. The engine has still
+    // counted (and attributed) the install. Nor is a start signal sent once a
+    // link is here, since no event may follow it (a loading state would never end).
     bool quiet() => record && _directArrived;
     if (!quiet()) {
       _announce(LinkStart(id: id, kind: LinkKind.deferred, appState: AppStateAtLink.closed, at: t0));
     }
-    LinkEvent done(LinkEvent e) => quiet() && !e.matched ? e : _emit(e);
+    LinkEvent done(LinkEvent e) => quiet() ? e : _emit(e);
     // No answer, 429 or 5xx = try again next launch (reported as 'network').
     Future<_Res> answered(String path, Map<String, dynamic> body) async {
       final r = await _call('POST', path, body);
@@ -442,10 +443,12 @@ class StraitLinks {
     // iOS, on the once-per-install check (never the debug re-check). No answer
     // = the choice is unknown: the clipboard stays untouched and the check
     // runs again next launch. Same openId across both attempts, one event.
-    if (result.matched || !(record && pasteOn && platform == 'ios' && _clipboard != null)) {
+    // Once a link is here the result won't be delivered: don't read the
+    // clipboard (that shows iOS's paste prompt for nothing).
+    if (result.matched || quiet() || !(record && pasteOn && platform == 'ios' && _clipboard != null)) {
       return done(result);
     }
-    final token = await _handoffToken();
+    final token = await _handoffToken(quiet);
     if (token == null) return done(result);
     try {
       final c = await answered('/v1/handoff/claim', {
@@ -475,10 +478,11 @@ class StraitLinks {
 
   /// B19 steps 1-3: detect without a prompt, read only when a web URL is
   /// likely (this shows iOS's paste prompt), keep only a Strait handoff token.
-  Future<String?> _handoffToken() async {
+  /// `skip()` true after the prompt-free detect (a link arrived meanwhile) = no read, no prompt.
+  Future<String?> _handoffToken(bool Function() skip) async {
     try {
       final clip = _clipboard!;
-      if (!await clip.hasProbableWebUrl()) return null;
+      if (!await clip.hasProbableWebUrl() || skip()) return null;
       return parseHandoffUrl(await clip.readText(), _linkHosts);
     } catch (_) {
       return null;

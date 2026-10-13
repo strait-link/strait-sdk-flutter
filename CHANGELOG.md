@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.9.2
+
+- Fix: a link that opens the app while the first-launch deferred check is still running is no
+  longer followed by that check's *match* either (0.9.1 held back only its "no link" event). The
+  app stays on the screen the person just tapped instead of jumping to a stale pre-install
+  destination. The engine still counts the install and records and attributes the match as before,
+  the check is still marked done, and the match is not added to `events` (no replay to late
+  `onLink` listeners). `checkDeferred()` still returns (and delivers) its answer (contract B6).
+- iPhone paste handoff: once a link has opened the app in this launch, the first-launch check no
+  longer reads the clipboard, so iOS shows no "Allow Paste" prompt for an answer that won't be
+  delivered. Checked again right after the prompt-free URL detect; a clipboard already read is
+  claimed as before (contract B6/B19).
+- Known gap (no API change): if the check had already sent its `onLinkStart` when the link arrived,
+  no `onLink` event with that start's `id` follows. The documented pattern (loading on at any
+  `onLinkStart`, off at any `onLink`) stays correct because the link's own start and event come
+  after it; an app that tracks loading per `id` should also clear pending deferred ids when a
+  `direct` event arrives.
+
 ## 0.9.1
 
 - Fix: a link that opens the app while the first-launch deferred check is still running is no

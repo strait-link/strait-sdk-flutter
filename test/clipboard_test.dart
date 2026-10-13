@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -21,6 +22,8 @@ class SpyClipboard implements StraitClipboard {
   bool probable;
   String? text;
   bool throws;
+  /// Holds the prompt-free detect until it completes (tests a link arriving meanwhile).
+  Future<void>? detectGate;
   int detects = 0;
   int reads = 0;
   SpyClipboard({this.probable = true, this.text = handoff, this.throws = false});
@@ -28,6 +31,7 @@ class SpyClipboard implements StraitClipboard {
   @override
   Future<bool> hasProbableWebUrl() async {
     detects++;
+    if (detectGate != null) await detectGate;
     if (throws) throw StateError('no pasteboard');
     return probable;
   }
@@ -42,10 +46,14 @@ class SpyClipboard implements StraitClipboard {
 class Engine {
   final Map<String, Object> routes;
   final Map<String, int> status;
+  /// Paths whose reply waits for the future (a request held open).
+  final Map<String, Future<void>> holds;
   final calls = <MapEntry<String, Map<String, dynamic>?>>[];
-  Engine(this.routes, {this.status = const {}});
+  Engine(this.routes, {this.status = const {}, this.holds = const {}});
   late final http.Client client = MockClient((req) async {
     calls.add(MapEntry(req.url.path, req.body.isEmpty ? null : jsonDecode(req.body) as Map<String, dynamic>));
+    final hold = holds[req.url.path];
+    if (hold != null) await hold;
     final code = status[req.url.path];
     if (code != null) return http.Response('{}', code);
     final p = routes[req.url.path];
@@ -358,6 +366,67 @@ void main() {
       expect(pasteHandoffOn(noMatchOldEngine), isFalse);
       expect(pasteHandoffOn({'matched': false, 'ios': {'pasteHandoff': 'true'}}), isFalse);
       expect(pasteHandoffOn(null), isFalse);
+    });
+  });
+
+  // B6 + B19 (13 Oct follow-up): once a link has opened the app in this launch,
+  // the first-launch check's answer won't be delivered, so reading the
+  // clipboard would show iOS's paste prompt for nothing.
+  group('a link that arrives during the first-launch check: no paste prompt', () {
+    Future<void> flush() => Future<void>.delayed(Duration.zero);
+    Future<void> until(bool Function() cond) async {
+      for (var i = 0; i < 50 && !cond(); i++) {
+        await flush();
+      }
+    }
+
+    /// Starts the check, delivers a link once [held] is true, then opens [gate].
+    Future<(List<LinkEvent>, MemoryStore)> play(Engine e, SpyClipboard clip, Completer<void> gate, bool Function() held) async {
+      final storage = MemoryStore();
+      final s = make(e, clip: clip, storage: storage);
+      final events = <LinkEvent>[];
+      s.onLink.listen(events.add);
+      final started = s.start();
+      await until(held);
+      await s.handleUrl('https://shop.example/product/42');
+      gate.complete();
+      await started;
+      await flush();
+      return (events, storage);
+    }
+
+    List<String> deferredPaths(Engine e) => e.paths.where((p) => p != '/v1/open').toList(); // minus the link's own open report
+
+    test('link before the clipboard step (/v1/match still waiting): the clipboard is never touched', () async {
+      final gate = Completer<void>();
+      final e = Engine({'/v1/match': noMatch, '/v1/handoff/claim': claimed}, holds: {'/v1/match': gate.future});
+      final clip = SpyClipboard();
+      final (events, storage) = await play(e, clip, gate, () => e.paths.contains('/v1/match'));
+      expect((clip.detects, clip.reads), (0, 0));
+      expect(deferredPaths(e), ['/v1/match']);
+      expect(events.map((ev) => ev.kind), [LinkKind.direct]);
+      expect(await storage.get('strait.deferredChecked'), '1');
+    });
+
+    test('link while the prompt-free detect runs: the clipboard is not read', () async {
+      final gate = Completer<void>();
+      final e = Engine({'/v1/match': noMatch, '/v1/handoff/claim': claimed});
+      final clip = SpyClipboard()..detectGate = gate.future;
+      final (events, _) = await play(e, clip, gate, () => clip.detects > 0);
+      expect((clip.detects, clip.reads), (1, 0));
+      expect(deferredPaths(e), ['/v1/match']);
+      expect(events.map((ev) => ev.kind), [LinkKind.direct]);
+    });
+
+    test('link after the read: the claim goes ahead as before, but its match is not delivered', () async {
+      final gate = Completer<void>();
+      final e = Engine({'/v1/match': noMatch, '/v1/handoff/claim': claimed}, holds: {'/v1/handoff/claim': gate.future});
+      final clip = SpyClipboard();
+      final (events, storage) = await play(e, clip, gate, () => e.paths.contains('/v1/handoff/claim'));
+      expect((clip.detects, clip.reads), (1, 1));
+      expect(deferredPaths(e), ['/v1/match', '/v1/handoff/claim']);
+      expect(events.map((ev) => ev.kind), [LinkKind.direct]);
+      expect(await storage.get('strait.deferredChecked'), '1');
     });
   });
 

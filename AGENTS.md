@@ -16,7 +16,7 @@ dependencies:
   strait_sdk:
     git:
       url: https://github.com/bazingga08/strait-sdk-flutter
-      ref: v0.9.1
+      ref: v0.9.2
 ```
 
 ```sh
