@@ -9,6 +9,9 @@
   `portraitScreenWidth`, `AppLifecycle`, `AppStateAtLink` and `LinkRoute`. Nothing else changed:
   `StraitLinks`, `resolveDeferredLink`, `DeviceFields`, `MatchResult` and the store sheet are as before.
   If you called one of the helpers anyway, import `package:strait_sdk/src/core.dart` (not a supported API).
+- Migration: if you copied the dashboard's Flutter setup before 13 Oct, it called `browserScreenWidth(w)`.
+  Use `portraitScreenWidth(w, h)` (what the docs and the dashboard show now). It is also the correct
+  width when the app starts in landscape (contract B17).
 - `example/example.dart` shows only `resolveDeferredLink`.
 
 ## 0.8.3
