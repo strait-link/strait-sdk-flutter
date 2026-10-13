@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.9.1
+
+- Fix: a link that opens the app while the first-launch deferred check is still running is no
+  longer followed by that check's "no link" event (`matched: false`, `no_match` or `network`).
+  Found with the React Native SDK on an Android emulator (13 Oct): the link was delivered
+  (`/product/42`) and the check's `false` came right after it, so an app that routes home on
+  `!matched` left the right screen. Flutter had the same race (`start(urls: ...)` listens for links
+  before the check finishes). The check still runs and counts the install, and is marked done (or
+  retried next launch) as before; only its no-link event is not delivered. A deferred match is
+  still delivered; `checkDeferred()` is unchanged (contract B6).
+
 ## 0.9.0
 
 - Smaller public API (SDK-23, decision record: shared-spec `docs/adr/0001-sdk-public-api-surface.md`). `package:strait_sdk/strait_sdk.dart`

@@ -165,6 +165,8 @@ class StraitLinks {
   final bool clipboardBoost;
   final StraitClipboard? _clipboard;
   bool _firstLaunch = false;
+  /// A direct link arrived in this launch (B6: the check's "no link" then stays quiet).
+  bool _directArrived = false;
 
   final _tracker = AppStateTracker();
   final _events = <LinkEvent>[];
@@ -271,6 +273,7 @@ class StraitLinks {
       _handleUrl(raw, appState, false);
 
   Future<LinkEvent> _handleUrl(String raw, AppStateAtLink? appState, bool firstLaunch) async {
+    _directArrived = true;
     final t0 = _now();
     final state = appState ?? _tracker.classify(t0);
     final id = newOpenId(t0);
@@ -355,6 +358,10 @@ class StraitLinks {
     final id = newOpenId(t0);
     final tag = record ? {'openId': id, 'at': t0} : const <String, Object>{'record': false};
     _announce(LinkStart(id: id, kind: LinkKind.deferred, appState: AppStateAtLink.closed, at: t0));
+    // B6: a link that arrived while this once-per-install check ran is what the
+    // person wants now. The check's "no link" answer (no_match or network) is
+    // returned but not delivered: it would pull the app off that link's screen.
+    LinkEvent done(LinkEvent e) => record && _directArrived && !e.matched ? e : _emit(e);
     // No answer, 429 or 5xx = try again next launch (reported as 'network').
     Future<_Res> answered(String path, Map<String, dynamic> body) async {
       final r = await _call('POST', path, body);
@@ -431,10 +438,10 @@ class StraitLinks {
     // = the choice is unknown: the clipboard stays untouched and the check
     // runs again next launch. Same openId across both attempts, one event.
     if (result.matched || !(record && pasteOn && platform == 'ios' && _clipboard != null)) {
-      return _emit(result);
+      return done(result);
     }
     final token = await _handoffToken();
-    if (token == null) return _emit(result);
+    if (token == null) return done(result);
     try {
       final c = await answered('/v1/handoff/claim', {
         'publishableKey': publishableKey,
@@ -442,10 +449,10 @@ class StraitLinks {
         'platform': 'ios',
         ...tag,
       });
-      if (c.json['matched'] != true) return _emit(result); // not claimable: keep the match result
+      if (c.json['matched'] != true) return done(result); // not claimable: keep the match result
       _noteTap(replyClickId(c.json['clickId']), t0);
       final dest = _destination(_str(c.json['longUrl']));
-      return _emit(LinkEvent(
+      return done(LinkEvent(
         id: id, kind: LinkKind.deferred, route: LinkRoute.clipboard,
         appState: AppStateAtLink.closed, matched: true,
         url: dest.url, path: dest.path, params: dest.params,
@@ -453,7 +460,7 @@ class StraitLinks {
         referralCode: replyReferralCode(c.json['referralCode']), ms: _now() - t0, at: t0,
       ));
     } catch (_) {
-      return _emit(LinkEvent(
+      return done(LinkEvent(
         id: id, kind: LinkKind.deferred, route: LinkRoute.clipboard,
         appState: AppStateAtLink.closed, matched: false, reason: 'network',
         ms: _now() - t0, at: t0,

@@ -343,6 +343,81 @@ void main() {
       expect(h.events.map((e) => e.kind), [LinkKind.direct]);
       expect(await storage.get('strait.deferredChecked'), '1');
     });
+
+    // Found with the React Native SDK on an Android emulator (13 Oct): the
+    // first-launch check's /v1/match was still waiting when a tapped link
+    // arrived; the link was delivered, then the check's "no link", and an app
+    // that routes home on !matched left the right screen (B6).
+    group('a link that arrives while the first-launch check runs wins (B6)', () {
+      /// /v1/match held until [gate] completes; other paths answer 202.
+      (StraitLinks, FakePhone, List<LinkEvent>, MemoryStore, List<String>) held(
+          Completer<void> gate, http.Response Function() matchReply) {
+        final phone = FakePhone();
+        final storage = MemoryStore();
+        final paths = <String>[];
+        final strait = StraitLinks(
+          publishableKey: pk, endpoint: endpoint, platform: 'android',
+          deviceFields: () => device, storage: storage, installReferrer: () async => null,
+          client: MockClient((req) async {
+            paths.add(req.url.path);
+            if (req.url.path == '/v1/match') {
+              await gate.future;
+              return matchReply();
+            }
+            return http.Response('{}', 202);
+          }),
+          now: () => phone.t,
+        );
+        final events = <LinkEvent>[];
+        strait.onLink.listen(events.add);
+        return (strait, phone, events, storage, paths);
+      }
+
+      Future<void> until(bool Function() cond) async {
+        for (var i = 0; i < 50 && !cond(); i++) {
+          await flush();
+        }
+      }
+
+      test("the check's no-match is not delivered after the link", () async {
+        final gate = Completer<void>();
+        final (strait, phone, events, storage, paths) =
+            held(gate, () => http.Response(jsonEncode({'matched': false}), 200));
+        final started = strait.start(urls: phone.urls.stream, lifecycle: phone.states.stream);
+        await until(() => paths.contains('/v1/match'));
+        phone.tap('straitlink://shop.example/product/42');
+        await until(() => events.isNotEmpty);
+        gate.complete();
+        await started;
+        await flush();
+        expect(events.map((e) => (e.kind, e.matched, e.path)), [(LinkKind.direct, true, '/product/42')]);
+        expect(await storage.get('strait.deferredChecked'), '1');
+        expect(strait.events.map((e) => e.kind), [LinkKind.direct]);
+      });
+
+      test("nor its 'network' answer, and the check runs again next launch", () async {
+        final gate = Completer<void>();
+        final (strait, phone, events, storage, paths) = held(gate, () => http.Response('', 503));
+        final started = strait.start(urls: phone.urls.stream, lifecycle: phone.states.stream);
+        await until(() => paths.contains('/v1/match'));
+        phone.tap('straitlink://shop.example/product/42');
+        await until(() => events.isNotEmpty);
+        gate.complete();
+        await started;
+        await flush();
+        expect(events.map((e) => e.kind), [LinkKind.direct]);
+        expect(await storage.get('strait.deferredChecked'), isNull);
+      });
+
+      test('with no link this launch, the no-match is still delivered', () async {
+        final gate = Completer<void>()..complete();
+        final (strait, phone, events, _, _) =
+            held(gate, () => http.Response(jsonEncode({'matched': false}), 200));
+        await strait.start(urls: phone.urls.stream, lifecycle: phone.states.stream);
+        await flush();
+        expect(events.map((e) => (e.kind, e.matched, e.reason)), [(LinkKind.deferred, false, 'no_match')]);
+      });
+    });
   });
 
   group('fingerprint check + events (B13)', () {
