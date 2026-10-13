@@ -8,7 +8,8 @@
   (`/product/42`) and the check's `false` came right after it, so an app that routes home on
   `!matched` left the right screen. Flutter had the same race (`start(urls: ...)` listens for links
   before the check finishes). The check still runs and counts the install, and is marked done (or
-  retried next launch) as before; only its no-link event is not delivered. A deferred match is
+  retried next launch) as before; only its no-link event is not delivered, and it sends no
+  `onLinkStart` once a link is here (a loading state would never end). A deferred match is
   still delivered; `checkDeferred()` is unchanged (contract B6).
 
 ## 0.9.0

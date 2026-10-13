@@ -357,11 +357,16 @@ class StraitLinks {
     final t0 = _now();
     final id = newOpenId(t0);
     final tag = record ? {'openId': id, 'at': t0} : const <String, Object>{'record': false};
-    _announce(LinkStart(id: id, kind: LinkKind.deferred, appState: AppStateAtLink.closed, at: t0));
-    // B6: a link that arrived while this once-per-install check ran is what the
-    // person wants now. The check's "no link" answer (no_match or network) is
-    // returned but not delivered: it would pull the app off that link's screen.
-    LinkEvent done(LinkEvent e) => record && _directArrived && !e.matched ? e : _emit(e);
+    // B6: a link that arrived before or while this once-per-install check ran is
+    // what the person wants now. The check's "no link" answer (no_match or
+    // network) is returned but not delivered: it would pull the app off that
+    // link's screen. Nor is a start signal sent once a link is here, since no
+    // event may follow it (a loading state would never end).
+    bool quiet() => record && _directArrived;
+    if (!quiet()) {
+      _announce(LinkStart(id: id, kind: LinkKind.deferred, appState: AppStateAtLink.closed, at: t0));
+    }
+    LinkEvent done(LinkEvent e) => quiet() && !e.matched ? e : _emit(e);
     // No answer, 429 or 5xx = try again next launch (reported as 'network').
     Future<_Res> answered(String path, Map<String, dynamic> body) async {
       final r = await _call('POST', path, body);

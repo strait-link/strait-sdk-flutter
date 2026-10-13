@@ -409,6 +409,24 @@ void main() {
         expect(await storage.get('strait.deferredChecked'), isNull);
       });
 
+      test('a link before the check starts: no start signal left without its event', () async {
+        final gate = Completer<void>();
+        final (strait, phone, events, _, paths) =
+            held(gate, () => http.Response(jsonEncode({'matched': false}), 200));
+        var opening = false; // the documented loading pattern: on at any start, off at any event
+        strait.onLinkStart.listen((_) => opening = true);
+        strait.onLink.listen((_) => opening = false);
+        // The link is already handled when start() runs its check.
+        await strait.handleUrl('straitlink://shop.example/product/42');
+        final started = strait.start(urls: phone.urls.stream, lifecycle: phone.states.stream);
+        await until(() => paths.contains('/v1/match'));
+        gate.complete();
+        await started;
+        await flush();
+        expect(events.map((e) => e.kind), [LinkKind.direct]);
+        expect(opening, isFalse);
+      });
+
       test('with no link this launch, the no-match is still delivered', () async {
         final gate = Completer<void>()..complete();
         final (strait, phone, events, _, _) =
