@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:test/test.dart';
 import 'package:strait_sdk/src/strait.dart';
+import 'package:strait_sdk/src/core.dart';
 
 const key = 'st_pub_test_0123456789abcdef0123456789abcdef';
 

@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:strait_sdk/strait_sdk.dart';
 import 'package:test/test.dart';
+import 'package:strait_sdk/src/core.dart';
 
 /// Contract B21 (proposal): a matched deferred reply's `referralCode` reaches
 /// the app on the LinkEvent, unchanged, only when it is a valid code.

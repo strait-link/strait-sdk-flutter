@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:strait_sdk/strait_sdk.dart';
 import 'package:test/test.dart';
+import 'package:strait_sdk/src/core.dart';
 
 /// Cross-language contract: the same conformance vectors every Strait SDK
 /// asserts (generated from sdk-react-native/src/core.ts).

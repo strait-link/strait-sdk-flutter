@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:strait_sdk/strait_sdk.dart';
 import 'package:test/test.dart';
+import 'package:strait_sdk/src/core.dart';
 
 const click = '9a1c7e52-4b3d-4f8e-a6d1-0c2b5e7f9a34';
 const referrer = 'strait_link=lnk_42&strait_click=$click';

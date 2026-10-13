@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.9.0
+
+- Smaller public API (SDK-23, decision record: shared-spec `docs/adr/0001-sdk-public-api-surface.md`). `package:strait_sdk/strait_sdk.dart`
+  no longer exports the contract helpers in `src/core.dart` (`classifyUrl`, `splitUrl`, `pruneOpenQueue`,
+  `rememberTap`, `shouldRetryReport`, `newOpenId`, `parseStraitLink`, `pasteHandoffOn`, `AppStateTracker`,
+  the queue and window constants, ...). They were never in the docs. Still public from core:
+  `portraitScreenWidth`, `AppLifecycle`, `AppStateAtLink` and `LinkRoute`. Nothing else changed:
+  `StraitLinks`, `resolveDeferredLink`, `DeviceFields`, `MatchResult` and the store sheet are as before.
+  If you called one of the helpers anyway, import `package:strait_sdk/src/core.dart` (not a supported API).
+- `example/example.dart` shows only `resolveDeferredLink`.
+
 ## 0.8.3
 
 - `checkDeferred()` (the debug / settings re-check) now sends `"record": false` on `/v1/match` and `/v1/referrer`, so the

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:strait_sdk/strait_sdk.dart';
+import 'package:strait_sdk/src/core.dart' show pasteHandoffOn;
 import 'package:test/test.dart';
 
 /// Contract B19: the iPhone paste handoff is the customer's choice in the

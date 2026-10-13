@@ -3,8 +3,6 @@ import 'package:http/http.dart' as http;
 
 import 'core.dart';
 
-export 'core.dart' show parseStraitLink;
-
 /// Coarse, privacy-clean device fields the server hashes into a match signature.
 /// (The server adds the IP it observes; the client never sends one.)
 class DeviceFields {
