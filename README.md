@@ -49,7 +49,7 @@ signature that drifts from the other languages fails the build.
 | Android: direct links and deferred links | ● Live | App Links, custom schemes, Play Install Referrer. |
 | iPhone: Universal Links and install matching | ◐ Beta | Your choice in Dashboard → Settings → iPhone installs: device matching, paste handoff, both or neither, read from Strait at runtime. Device matching is off by default. iPhone matches are labelled Estimated until measured. |
 | Store sheet: the store inside your app | ◐ Beta | Keeps the deep link through the install. |
-| Published on pub.dev | – Not yet | Add it as a git dependency until it is. |
+| Published on pub.dev | ● Live | `dart pub add strait_sdk` (Flutter: `flutter pub add strait_sdk`). |
 
 ● Live · ◐ Beta · ○ Planned · – Not yet. The same words as the [platform status](https://straitlink.in/platform-status/) page.
 
@@ -61,14 +61,11 @@ dart pub add strait_sdk      # Flutter apps: flutter pub add strait_sdk
 ```
 <!-- /brand:install -->
 
-Not on pub.dev yet. Until it is, add it as a git dependency in `pubspec.yaml`:
+Or pin it in `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  strait_sdk:
-    git:
-      url: https://github.com/bazingga08/strait-sdk-flutter
-      ref: v0.9.2
+  strait_sdk: ^0.9.2
 ```
 
 Pure Dart (no Flutter dependency), so it works in Flutter apps and Dart servers alike.

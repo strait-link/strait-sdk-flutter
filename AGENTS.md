@@ -7,20 +7,10 @@ Pure Dart. The app hands it the launch link, a stream of later links and the lif
 
 ## Install
 
-**Not on pub.dev yet** (`flutter pub add strait_sdk` fails until it is published). Use a git
-dependency, plus the helper packages. Don't invent a pub.dev version or switch to a hosted dependency.
-
-```yaml
-# pubspec.yaml
-dependencies:
-  strait_sdk:
-    git:
-      url: https://github.com/bazingga08/strait-sdk-flutter
-      ref: v0.9.2
-```
+On pub.dev. Add it plus the helper packages:
 
 ```sh
-flutter pub add app_links shared_preferences play_install_referrer flutter_timezone
+flutter pub add strait_sdk app_links shared_preferences play_install_referrer flutter_timezone
 ```
 
 Native link settings as for any app: Android App Links intent filter (`autoVerify`) for
