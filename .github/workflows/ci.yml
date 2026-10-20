@@ -16,5 +16,6 @@ jobs:
       - run: dart pub get
       - run: dart analyze
       - run: dart test
+      - run: node scripts/spec-vectors.mjs
       - run: node scripts/brand.mjs
       - run: dart pub publish --dry-run
