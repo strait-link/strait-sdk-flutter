@@ -16,7 +16,7 @@ A tap opens the exact screen, and every link open and install is recorded in you
 <p align="center">
   <a href="https://github.com/bazingga08/strait-sdk-flutter/tags"><img alt="Latest version" src="https://img.shields.io/github/v/tag/bazingga08/strait-sdk-flutter?sort=semver&label=version&style=flat-square&labelColor=0F0D0A&color=423B33"></a>
   <a href="https://straitlink.in/platform-status/"><img alt="SDK: Beta" src="https://img.shields.io/badge/SDK-beta-423B33?style=flat-square&labelColor=0F0D0A"></a>
-  <a href="https://straitlink.in/docs/iphone-install-matching/"><img alt="iPhone: Beta" src="https://img.shields.io/badge/iPhone-beta-423B33?style=flat-square&labelColor=0F0D0A"></a>
+  <a href="https://straitlink.in/iphone-status/"><img alt="iPhone: Live" src="https://img.shields.io/badge/iPhone-live-423B33?style=flat-square&labelColor=0F0D0A"></a>
   <a href="https://github.com/bazingga08/strait-sdk-flutter/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/bazingga08/strait-sdk-flutter/ci.yml?branch=main&label=CI&style=flat-square&labelColor=0F0D0A"></a>
   <a href="LICENSE"><img alt="Licence: MIT" src="https://img.shields.io/badge/licence-MIT-423B33?style=flat-square&labelColor=0F0D0A"></a>
 </p>
@@ -35,7 +35,8 @@ screen, and deferred links survive the install (the user taps your link,
 installs the app, and lands on the right screen). On iPhone the method is
 your choice in Dashboard → Settings → iPhone installs (device matching, paste
 handoff, both, or neither), read from Strait at runtime; device matching is off
-by default for new workspaces, and iPhone install matching is in beta (see below).
+by default for new workspaces, and iPhone install matching is opt-in (see below).
+iPhone links (Universal Links) are live.
 
 Part of [Strait](https://straitlink.in). The match signature is a Dart port of
 the shared Strait signature recipe and is checked against the **same golden vectors**
@@ -47,11 +48,12 @@ signature that drifts from the other languages fails the build.
 | Feature | Status | Notes |
 |---|---|---|
 | Android: direct links and deferred links | ● Live | App Links, custom schemes, Play Install Referrer. |
-| iPhone: Universal Links and install matching | ◐ Beta | Your choice in Dashboard → Settings → iPhone installs: device matching, paste handoff, both or neither, read from Strait at runtime. Device matching is off by default. iPhone matches are labelled Estimated until measured. |
-| Store sheet: the store inside your app | ◐ Beta | Keeps the deep link through the install. |
+| iPhone: Universal Links | ● Live | Tested on a real iPhone (iOS 26), 21 Oct 2026: app open, in the background and closed. |
+| iPhone: install matching (deferred links) | Opt-in | Off until you choose it. Proven on iPhone simulators; the real-iPhone run waits on our App Store listing. Your choice in Dashboard → Settings → iPhone installs: device matching, paste handoff, both or neither, read from Strait at runtime. Device matching is off by default. iPhone matches are labelled Estimated until measured. |
+| Store sheet: the store inside your app | New | Keeps the deep link through the install. On iPhone it needs your app's App Store ID. |
 | Published on pub.dev | ● Live | `dart pub add strait_sdk` (Flutter: `flutter pub add strait_sdk`). |
 
-● Live · ◐ Beta · ○ Planned · – Not yet. The same words as the [platform status](https://straitlink.in/platform-status/) page.
+● Live · ◐ Beta · ○ Planned · – Not yet · Opt-in: off until you switch it on · New: released, still young. The same words as the [platform status](https://straitlink.in/platform-status/) page.
 
 ## Install
 
@@ -227,7 +229,7 @@ and `await strait.flushOpenReports()` (send now).
 | `linkId`, `ms`, `at`, `id` | link id, resolve time (ms), arrival time (epoch ms), id shared with `LinkStart` |
 | `referralCode` | deferred links only: the referral code the tap carried (link `referralCode` or `?strait_ref=`), else null. Preview, not switched on yet (contract B21); grant rewards from your server via the `referral.converted` webhook |
 
-## Store sheet (beta; iPhone is beta)
+## Store sheet (new)
 
 When a user taps **Install** for one of your other apps (a sibling, partner or
 "lite" app), show the app store *inside your app* and keep the deep link for the
@@ -272,8 +274,8 @@ shows `SKStoreProductViewController` or `SKOverlay` (sdk-swift's
   with `copyHandoffLink: true` (when the workspace's paste handoff is on) (override `writeClipboard`), then shows the App
   Store with the link's campaign as the `ct` token.
 
-The tap is recorded with `sent_to = store_sheet` and is not billed during the
-beta. It works only where your app is the host: a link tapped inside another
+The tap is recorded with `sent_to = store_sheet` and is not billed while
+the store sheet is new. It works only where your app is the host: a link tapped inside another
 company's app can't open a store sheet there.
 
 ## Use (legacy): `resolveDeferredLink`
@@ -321,7 +323,7 @@ taps are deleted, `staleTap`) · B19 (iPhone paste handoff, chosen in the dashbo
 page.link links: short → `/v1/resolve`, long → `link=` read on the device). Both
 shared vector files (conformance v8) are asserted in `dart test`.
 
-## iPhone deferred links (beta): you choose the method (B19)
+## iPhone deferred links (opt-in): you choose the method (B19)
 
 How iPhone install matching works, what it uses and how long it is kept:
 https://straitlink.in/docs/iphone-install-matching/
