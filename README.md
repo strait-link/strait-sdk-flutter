@@ -138,6 +138,13 @@ Future<StraitLinks> startStrait() async {
         timezone: timezone,
       );
     },
+    // Phone or tablet, sent with open reports and the store sheet (contract B14).
+    // Shorter side >= 600 logical px = tablet. iPad Safari sends a Mac user agent,
+    // so this is how Strait counts iPad opens. Leave it out to send nothing.
+    deviceClass: () {
+      final view = PlatformDispatcher.instance.views.first;
+      return deviceClassForSize(view.physicalSize.shortestSide / view.devicePixelRatio);
+    },
   );
 
   // Subscribe before start() so nothing is missed (past events replay anyway).
@@ -311,7 +318,7 @@ B7 (Install Referrer → `/v1/referrer` with `parseStraitClick`, else
 `onLinkStart`) · B10 (never throws) · B11 (`jsonEncode`) · B12 (`splitUrl`, no
 `Uri` parsing) · B13 (`trackEvent`, `reportFingerprint`, `compareFingerprint`)
 · B14 (every open reported once, `strait.pendingOpens` retry queue,
-`pendingOpenReports`, `flushOpenReports`) · B15 (events carry the remembered
+`pendingOpenReports`, `flushOpenReports`, `deviceClass` / `deviceClassForSize`) · B15 (events carry the remembered
 tap id, `strait.lastTap`, `eventClickId`) · B16 (the tap id from the
 `/v1/resolve`, `/v1/match` and `/v1/referrer` replies, `replyClickId`) · B17
 (portrait screen width, `portraitScreenWidth`) · B18 (reported and queued URLs
