@@ -107,7 +107,7 @@ https://straitlink.in/docs/troubleshooting/.
 - Wire names are part of the contract: query params `strait_click` / `strait_link`, storage keys `strait.*`,
   headers `X-Strait-*`. Don't rename them.
 - Brand: the name is spelled Strait (never "Straight"; the tagline "Straight to the screen. On the record." is fine). Don't write superlatives ("best", "cheapest") or speed / match-rate numbers in
-  docs or comments. iPhone links are live; iPhone install matching is opt-in and an Estimated match.
+  docs or comments. iPhone links are live (proven on a real iPhone with the Swift reference app; this SDK's iOS glue is unit-tested and hasn't run on a real iPhone); iPhone install matching is opt-in and an Estimated match.
 
 ## Support
 
