@@ -164,6 +164,7 @@ class StraitLinks {
   @Deprecated('Ignored: the workspace setting (Dashboard Settings -> iPhone installs) decides at runtime.')
   final bool clipboardBoost;
   final StraitClipboard? _clipboard;
+  final String? Function()? _deviceClass;
   bool _firstLaunch = false;
   /// A direct link arrived in this launch (B6: the first-launch check then stays quiet).
   bool _directArrived = false;
@@ -187,7 +188,9 @@ class StraitLinks {
     @Deprecated('Ignored: the workspace setting (Dashboard Settings -> iPhone installs) decides at runtime.')
     this.clipboardBoost = false,
     StraitClipboard? clipboard,
+    String? Function()? deviceClass,
   })  : _clipboard = clipboard,
+        _deviceClass = deviceClass,
         _base = endpoint.replaceAll(RegExp(r'/+$'), ''),
         _linkHosts = normalizeLinkHosts(
             endpoint.replaceAll(RegExp(r'/+$'), ''), linkHosts),
@@ -197,6 +200,17 @@ class StraitLinks {
         _http = client ?? http.Client(),
         _ownsHttp = client == null,
         _now = now ?? (() => DateTime.now().millisecondsSinceEpoch);
+
+  /// `{'deviceClass': 'phone' | 'tablet'}` when the app supplied one (contract
+  /// B14), else empty. Anything else, or a throwing callback, sends nothing.
+  Map<String, String> _deviceClassField() {
+    try {
+      final dc = _deviceClass?.call();
+      return dc == 'phone' || dc == 'tablet' ? {'deviceClass': dc!} : const {};
+    } catch (_) {
+      return const {};
+    }
+  }
 
   /// Every link event, including ones that happened before you subscribed.
   Stream<LinkEvent> get onLink => Stream<LinkEvent>.multi((c) {
@@ -303,6 +317,7 @@ class StraitLinks {
           'appState': state.name,
           'firstLaunch': firstLaunch,
           'at': t0,
+          ..._deviceClassField(),
         });
         final matched = r.json['matched'] == true;
         final reason = matched ? null : (_str(r.json['reason']) ?? _str(r.json['error']));
@@ -593,7 +608,8 @@ class StraitLinks {
   /// POST /v1/open; the HTTP status, or null when there was no answer.
   Future<int?> _sendReport(Map<String, dynamic> report) async {
     try {
-      return (await _call('POST', '/v1/open', {'publishableKey': publishableKey, ...report}))
+      // B14: deviceClass is added at send time, never saved in the queue.
+      return (await _call('POST', '/v1/open', {'publishableKey': publishableKey, ...report, ..._deviceClassField()}))
           .status;
     } catch (_) {
       return null;
@@ -711,7 +727,7 @@ class StraitLinks {
     return e;
   }
 
-  /// Store sheet (beta; iPhone is beta): show the app store inside your app
+  /// Store sheet (new): show the app store inside your app
   /// for one of your short links and keep the deep link for the app being
   /// installed. [opener] starts the Intent / shows StoreKit (README "Store
   /// sheet"). Never throws.
@@ -726,6 +742,7 @@ class StraitLinks {
         publishableKey: publishableKey,
         platform: platform,
         device: () => _device().toJson(),
+        deviceClass: _deviceClassField()['deviceClass'],
         url: url,
         options: options,
         opener: opener,

@@ -39,6 +39,16 @@ int browserScreenWidth(num logicalWidth) => (logicalWidth - 0.001).ceil();
 int portraitScreenWidth(num logicalWidth, num logicalHeight) =>
     browserScreenWidth(logicalWidth < logicalHeight ? logicalWidth : logicalHeight);
 
+/// The `deviceClass` sent with open reports and the store sheet (contract B14,
+/// engine ADR 0039), from the screen's shorter side in logical pixels:
+/// `'tablet'` from 600 (Android's sw600dp rule), else `'phone'`; null when
+/// unknown (0, negative, NaN). In Flutter:
+/// `deviceClassForSize(view.physicalSize.shortestSide / view.devicePixelRatio)`.
+String? deviceClassForSize(num shortestSide) {
+  if (!shortestSide.isFinite || shortestSide <= 0) return null;
+  return shortestSide >= 600 ? 'tablet' : 'phone';
+}
+
 class SplitUrl {
   final String scheme;
   final String host;

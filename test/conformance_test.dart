@@ -73,6 +73,14 @@ void main() {
     }
   });
 
+  group('deviceClass', () {
+    for (final c in v['deviceClass'] as List) {
+      test('${c['shortestSide']}', () {
+        expect(deviceClassForSize(c['shortestSide'] as num), c['expected']);
+      });
+    }
+  });
+
   group('portraitScreenWidth', () {
     for (final c in v['portraitScreenWidth'] as List) {
       test('${c['width']}x${c['height']}', () {
