@@ -727,7 +727,7 @@ class StraitLinks {
     return e;
   }
 
-  /// Store sheet (beta; iPhone is beta): show the app store inside your app
+  /// Store sheet (new): show the app store inside your app
   /// for one of your short links and keep the deep link for the app being
   /// installed. [opener] starts the Intent / shows StoreKit (README "Store
   /// sheet"). Never throws.
