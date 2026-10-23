@@ -141,7 +141,7 @@ void main() {
     });
   });
 
-  group('iPhone (beta)', () {
+  group('iPhone', () {
     test('saves the device match, then shows the product page', () async {
       final e = Engine({'/v1/store-sheet': iosReply(), '/v1/match-save': <String, Object>{}});
       final o = SpyOpener();

@@ -1,4 +1,4 @@
-/// Store sheet (beta; iPhone is beta). Show the app store INSIDE your app for
+/// Store sheet (new). Show the app store INSIDE your app for
 /// one of your Strait links and keep the deep link for the app being installed.
 /// Same flow as sdk-android, sdk-swift and sdk-react-native:
 ///
@@ -188,6 +188,8 @@ Future<StoreSheetResult> runStoreSheet({
   required String publishableKey,
   required String platform,
   required Map<String, dynamic> Function() device,
+  /// Sent as `deviceClass` when 'phone' or 'tablet' (contract B14).
+  String? deviceClass,
   required String url,
   required StoreSheetOptions options,
   required StoreSheetOpener opener,
@@ -198,7 +200,10 @@ Future<StoreSheetResult> runStoreSheet({
   String? reason;
   var reply = <String, dynamic>{};
   try {
-    final r = await call('/v1/store-sheet', {'publishableKey': publishableKey, 'url': url, 'platform': platform});
+    final r = await call('/v1/store-sheet', {
+      'publishableKey': publishableKey, 'url': url, 'platform': platform,
+      if (deviceClass == 'phone' || deviceClass == 'tablet') 'deviceClass': deviceClass,
+    });
     if (r.ok && r.json['ok'] == true) {
       reply = r.json;
     } else {
