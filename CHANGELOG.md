@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- New optional `deviceClass` callback on `StraitLinks` (contract B14, engine ADR 0039): `'phone'` or
+  `'tablet'` is sent with `/v1/resolve`, `/v1/open` (queued retries too) and `/v1/store-sheet`.
+  New `deviceClassForSize(shortestSide)`: >= 600 logical px = tablet. The README shows the Flutter
+  wiring. Left out when not supplied; older engines ignore it. Conformance vectors v9.
+
 ## 0.9.2
 
 - Fix: a link that opens the app while the first-launch deferred check is still running is no
