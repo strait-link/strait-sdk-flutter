@@ -43,6 +43,23 @@ the shared Strait signature recipe and is checked against the **same golden vect
 as the server, web, and React Native SDKs (run by `dart test` in CI), so a
 signature that drifts from the other languages fails the build.
 
+## Quick start (60 seconds)
+
+**1. Install.** ```sh
+flutter pub add strait_sdk
+```
+
+**2. Check your key and a link.** In **Dashboard → Links**, make a link with the path `summer` and the destination `https://shop.example.com/product/42`. Then ask Strait about it the way this SDK will:
+
+```sh
+curl -s https://<your-handle>.strait.link/v1/resolve -H 'Content-Type: application/json' \
+  -d '{"publishableKey":"st_pub_live_…","url":"https://<your-handle>.strait.link/summer","platform":"android"}'
+```
+
+**You should see:** `{"matched":true,"longUrl":"https://shop.example.com/product/42",…}`. The key comes from **Dashboard → Get started** and is safe in apps. `"reason":"not_found"` means the key is from another workspace or the path is wrong. The check counts as one tap in **Dashboard → Analytics**.
+
+**3. Wire it.** Paste `startStrait()` from [Use](#use-recommended-straitlinks) with your key and link address, and call it in `main()` before `runApp`. The [Flutter guide](https://straitlink.in/docs/sdks/flutter/) shows the phone setup and an `adb` command that should print the link's path.
+
 ## Platform features
 
 | Feature | Status | Notes |
