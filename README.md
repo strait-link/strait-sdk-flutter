@@ -489,6 +489,19 @@ dart pub get && dart test
 SDKs; `test/client_test.dart` covers the client scenarios with a fake engine and
 fake lifecycle; `test/opens_test.dart` covers open reporting (B14).
 
+## Example app
+
+[`example/example.dart`](example/example.dart) asks for the deferred link on first launch with
+`resolveDeferredLink`. CI analyzes and compiles it against this repo's source on every pull request.
+Put your publishable key and link host in it, then:
+
+```sh
+dart pub get
+dart run example/example.dart   # prints "route to …" when a link matched
+```
+
+For a Flutter app, wire `StraitLinks` as shown in [Use](#use-recommended-straitlinks).
+
 ## Docs and support
 
 - **Docs:** [straitlink.in/docs/sdks/flutter/](https://straitlink.in/docs/sdks/flutter/) · [platform status](https://straitlink.in/platform-status/) · [troubleshooting](https://straitlink.in/docs/troubleshooting/)

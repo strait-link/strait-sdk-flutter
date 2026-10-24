@@ -16,6 +16,9 @@ jobs:
       - run: dart pub get
       - run: dart analyze
       - run: dart test
+      # The example (example/example.dart) compiled against this repo's source; never run (no network).
+      - name: Build example
+        run: mkdir -p build && dart compile exe example/example.dart -o build/example
       - run: node scripts/spec-vectors.mjs
       - run: node scripts/brand.mjs
       - run: dart pub publish --dry-run
