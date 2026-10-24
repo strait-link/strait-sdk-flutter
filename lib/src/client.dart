@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import 'strait.dart' show DeviceFields;
 import 'core.dart';
+import 'doctor.dart';
 import 'store_sheet.dart';
 
 /// Persistent key/value storage, e.g. a `shared_preferences` wrapper.
@@ -672,6 +673,43 @@ class StraitLinks {
     } catch (_) {
       return null;
     }
+  }
+
+  /// Setup check for debug builds (contract B23): your key, your endpoint and
+  /// whether the link host's `/.well-known/assetlinks.json` (Android) or
+  /// `/.well-known/apple-app-site-association` (iOS) lists [appId] (your
+  /// package / bundle ID, e.g. from `package_info_plus`; left out = the
+  /// findings list what the host has) and, on Android, this build's signing
+  /// certificate [certSha256] (any case, with or without colons). One GET;
+  /// never runs by itself; never throws. Prints each finding with
+  /// `[Strait doctor]` when asserts are on (debug builds only).
+  Future<DoctorReport> doctor({String? appId, List<String> certSha256 = const []}) async {
+    final mobile = platform == 'android' || platform == 'ios';
+    DoctorFile? file;
+    if (mobile && doctorHost(_base) != null) {
+      final path = platform == 'android' ? 'assetlinks.json' : 'apple-app-site-association';
+      try {
+        final res = await _http.get(Uri.parse('$_base/.well-known/$path')).timeout(const Duration(seconds: 10));
+        file = DoctorFile(res.statusCode, res.body);
+      } catch (_) {
+        file = const DoctorFile(null, null);
+      }
+    }
+    final report = doctorFindings(
+      publishableKey: publishableKey,
+      endpoint: _base,
+      platform: mobile ? platform : 'android',
+      appId: appId,
+      certSha256: certSha256,
+      file: file,
+    );
+    assert(() {
+      for (final f in report.findings) {
+        print('[Strait doctor] ${f.severity} ${f.id}: ${f.title}${f.fix.isEmpty ? '' : '. Fix: ${f.fix}'}');
+      }
+      return true;
+    }());
+    return report;
   }
 
   /// Conversion / revenue event. Resolves true when accepted. Never throws.

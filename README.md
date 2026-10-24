@@ -84,7 +84,7 @@ Or pin it in `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  strait_sdk: ^0.9.3
+  strait_sdk: ^0.9.4
 ```
 
 Pure Dart (no Flutter dependency), so it works in Flutter apps and Dart servers alike.
@@ -302,6 +302,41 @@ The tap is recorded with `sent_to = store_sheet` and is not billed while
 the store sheet is new. It works only where your app is the host: a link tapped inside another
 company's app can't open a store sheet there.
 
+## Check your setup (doctor)
+
+Most "the link opens the browser, not the app" reports are setup: the app isn't listed for your link
+domain, or a secret key is in the app. `doctor()` checks the key, the endpoint and your link domain's
+`assetlinks.json` (Android) / `apple-app-site-association` (iOS) in one request (contract B23). Call it
+in debug builds; it never throws. The SDK is pure Dart and can't read your package or bundle ID, so
+pass it (left out, doctor lists what your domain has instead). One way is
+[`package_info_plus`](https://pub.dev/packages/package_info_plus) (`packageName` is the Android package
+and the iOS bundle ID):
+
+```dart
+import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:package_info_plus/package_info_plus.dart';
+
+if (kDebugMode) {
+  final info = await PackageInfo.fromPlatform();
+  await links.doctor(appId: info.packageName);
+}
+```
+
+**You should see** (debug console, Android):
+
+```
+[Strait doctor] ok key.ok: Publishable key is set
+[Strait doctor] ok app.listed: hilltop.strait.link lists com.example.app
+```
+
+An `error` line ends with what to do, e.g. `error app.missing: hilltop.strait.link doesn't list
+com.example.app. Fix: Add com.example.app in Dashboard → Apps & stores (listed now: …)`. It returns a
+`DoctorReport` (`ok`, `findings`: each `id`, `severity`, `title`, `fix`); `ok` is false when any finding
+is an `error`. Lines print only when asserts are on (debug builds). On Android, pass
+`certSha256: ['AB:CD:…']` (from `./gradlew signingReport`) to also check this build's signing
+certificate. The free web checker and the docs cover what the app can't see (intent filters,
+Associated Domains). The checks themselves are the pure `doctorFindings(...)`.
+
 ## Use (legacy): `resolveDeferredLink`
 
 Still supported for apps that only want the deferred match:
@@ -344,7 +379,8 @@ tap id, `strait.lastTap`, `eventClickId`) · B16 (the tap id from the
 carry no query or fragment except `utm_source`, `reportUrl`; expired remembered
 taps are deleted, `staleTap`) · B19 (iPhone paste handoff, chosen in the dashboard at runtime,
 `parseHandoffUrl`, `/v1/handoff/claim`, `claimHandoff`) · B22 (old Firebase
-page.link links: short → `/v1/resolve`, long → `link=` read on the device). Both
+page.link links: short → `/v1/resolve`, long → `link=` read on the device) · B23
+(`doctor()` setup check, `doctorFindings`). Both
 shared vector files (conformance v8) are asserted in `dart test`.
 
 ## iPhone deferred links (opt-in): you choose the method (B19)
@@ -487,7 +523,8 @@ dart pub get && dart test
 `test/signature_test.dart` (signature) and `test/conformance_test.dart`
 (URL / referrer / app-state logic) enforce byte-for-byte parity with the other
 SDKs; `test/client_test.dart` covers the client scenarios with a fake engine and
-fake lifecycle; `test/opens_test.dart` covers open reporting (B14).
+fake lifecycle; `test/opens_test.dart` covers open reporting (B14);
+`test/doctor_test.dart` covers every `doctor()` finding (B23).
 
 ## Example app
 

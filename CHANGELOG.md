@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.9.4
+
+- New: `links.doctor({appId, certSha256})`, a setup check for debug builds (contract B23, shared-spec
+  ADR 0002). One GET of your link domain's `/.well-known/assetlinks.json` (Android) or
+  `/.well-known/apple-app-site-association` (iOS), then checks the key (secret key in the app?), the
+  endpoint, whether the file lists your app and (Android, when you pass it) this build's signing
+  certificate. Never throws; prints each finding with `[Strait doctor]` only when asserts are on
+  (debug builds); returns a `DoctorReport` (`ok`, `findings`). The same finding ids and wording as
+  every Strait SDK. Also exported: the pure `doctorFindings(...)` and `DoctorFinding` / `DoctorReport`
+  / `DoctorFile`. Pure Dart can't read the package or bundle ID, so pass `appId` (e.g. from
+  `package_info_plus`; left out: `app.unknown`). No new dependency, no other behaviour change.
+
 ## 0.9.3
 
 - New optional `deviceClass` callback on `StraitLinks` (contract B14, engine ADR 0039): `'phone'` or
