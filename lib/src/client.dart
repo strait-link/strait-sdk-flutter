@@ -195,9 +195,8 @@ class StraitLinks {
     String? Function()? deviceClass,
   })  : _clipboard = clipboard,
         _deviceClass = deviceClass,
-        _base = endpoint.replaceAll(RegExp(r'/+$'), ''),
-        _linkHosts = normalizeLinkHosts(
-            endpoint.replaceAll(RegExp(r'/+$'), ''), linkHosts),
+        _base = trimTrailingSlashes(endpoint),
+        _linkHosts = normalizeLinkHosts(trimTrailingSlashes(endpoint), linkHosts),
         _storage = storage ?? MemoryStore(),
         _installReferrer = installReferrer,
         _device = deviceFields,
