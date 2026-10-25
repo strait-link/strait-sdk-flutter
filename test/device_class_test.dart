@@ -59,7 +59,7 @@ void main() {
     expect(deviceClassForSize(double.nan), isNull);
   });
 
-  test('short link: /v1/resolve and its offline retry via /v1/open carry it', () async {
+  test('short link: /v1/resolve and its offline retry via /v1/open carry it', testOn: 'vm', () async {
     final e = Engine({'/v1/resolve': 'offline'});
     final s = links(e, () => 'tablet');
     await s.start(initialUrl: 'https://links.test/sale');
@@ -72,7 +72,7 @@ void main() {
     expect(open['deviceClass'], 'tablet');
   });
 
-  test('direct open via /v1/open carries it; the saved queue never does', () async {
+  test('direct open via /v1/open carries it; the saved queue never does', testOn: 'vm', () async {
     final storage = MemoryStore()..data['strait.deferredChecked'] = '1';
     final e = Engine({'/v1/open': 'offline'});
     await links(e, () => 'phone', storage: storage).start(initialUrl: 'https://shop.example/p/9');
