@@ -1,13 +1,14 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:test/test.dart';
+
+import 'support/fixture.dart';
 import 'package:strait_sdk/src/core.dart';
 
 /// Cross-language contract: the same conformance vectors every Strait SDK
 /// asserts (generated from sdk-react-native/src/core.ts).
-void main() {
-  final v = jsonDecode(File('test/conformance-vectors.json').readAsStringSync())
+void main() async {
+  final v = jsonDecode(await readFixture('conformance-vectors.json'))
       as Map<String, dynamic>;
 
   test('constants', () {
