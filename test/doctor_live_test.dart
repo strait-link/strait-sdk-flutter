@@ -1,6 +1,9 @@
 // Live proof of doctor() against a real link host. Skipped unless
 // STRAIT_DOCTOR_LIVE is set, so CI never calls Strait:
 //   STRAIT_DOCTOR_LIVE=https://strait-dev.strait.link dart test test/doctor_live_test.dart -r expanded
+@TestOn('vm')
+library;
+
 import 'dart:io';
 
 import 'package:strait_sdk/strait_sdk.dart';

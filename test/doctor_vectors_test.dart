@@ -1,14 +1,15 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:strait_sdk/strait_sdk.dart';
 import 'package:test/test.dart';
 
+import 'support/fixture.dart';
+
 // doctor-vectors.json (contract B23, ADR 0002): the same inputs give the same
 // ids, severities, titles and fixes as the React Native reference (0.9.3) and
 // the Android SDK, which carry the same file.
-void main() {
-  final vectors = (jsonDecode(File('test/doctor-vectors.json').readAsStringSync()) as Map)['vectors'] as List;
+void main() async {
+  final vectors = (jsonDecode(await readFixture('doctor-vectors.json')) as Map)['vectors'] as List;
 
   test('has a vector for every ADR row', () => expect(vectors.length, greaterThanOrEqualTo(40)));
 
