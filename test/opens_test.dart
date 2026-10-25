@@ -394,7 +394,8 @@ void main() {
     });
   });
 
-  group('first launch and the deferred check (B6/B7 revised)', () {
+  // Install paths: VM only (web builds have no install, see test/web_test.dart).
+  group('first launch and the deferred check (B6/B7 revised)', testOn: 'vm', () {
     test('first launch opened by a link: no deferred check, and the open counts as the install',
         () async {
       final engine = FakeEngine({'/v1/resolve': resolved});

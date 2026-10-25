@@ -254,7 +254,8 @@ void main() {
     });
   });
 
-  group('deferred links (installed after tapping)', () {
+  // Install paths: VM only (web builds have no install, see test/web_test.dart).
+  group('deferred links (installed after tapping)', testOn: 'vm', () {
     const referrerHit = {
       '/v1/referrer': {
         'matched': true,
@@ -542,7 +543,7 @@ void main() {
       expect(eventBody(h.engine)!.containsKey('clickId'), isFalse);
     });
 
-    test('the Play referrer tap is remembered on a deferred install', () async {
+    test('the Play referrer tap is remembered on a deferred install', testOn: 'vm', () async {
       final h = make(
           FakeEngine({
             '/v1/event': {'ok': true},
@@ -579,7 +580,7 @@ void main() {
       expect(jsonDecode(store.data['strait.lastTap']!), {'clickId': tap, 'at': 1001000});
     });
 
-    test('B16: a fingerprint match remembers the tap id the engine returns', () async {
+    test('B16: a fingerprint match remembers the tap id the engine returns', testOn: 'vm', () async {
       final h = make(FakeEngine({
         '/v1/event': {'ok': true},
         '/v1/match': {'matched': true, 'longUrl': 'https://shop.example/p/9', 'linkId': 'lnk_9', 'clickId': tap},
@@ -589,7 +590,7 @@ void main() {
       expect(eventBody(h.engine)!['clickId'], tap);
     });
 
-    test("B16: the referrer reply's tap id wins over the parsed one", () async {
+    test("B16: the referrer reply's tap id wins over the parsed one", testOn: 'vm', () async {
       final h = make(
           FakeEngine({
             '/v1/event': {'ok': true},

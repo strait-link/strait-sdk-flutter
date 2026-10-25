@@ -16,6 +16,9 @@ jobs:
       - run: dart pub get
       - run: dart analyze
       - run: dart test
+      # Flutter web compiles this package with dart2js or dart2wasm: run the suite in Chrome with both.
+      - run: dart test -p chrome
+      - run: dart test -p chrome -c dart2wasm
       # The example (example/example.dart) compiled against this repo's source; never run (no network).
       - name: Build example
         run: mkdir -p build && dart compile exe example/example.dart -o build/example

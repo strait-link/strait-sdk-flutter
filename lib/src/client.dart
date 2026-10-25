@@ -137,6 +137,9 @@ const _deferredFlag = 'strait.deferredChecked';
 const _queueKey = 'strait.pendingOpens';
 const _tapKey = 'strait.lastTap';
 
+/// True in a web build (dart2js and dart2wasm), the same test as Flutter's `kIsWeb`.
+const bool _onWeb = bool.fromEnvironment('dart.library.js_interop');
+
 /// The Strait client: direct links (app_links), deferred links, analytics.
 ///
 /// Port of the React Native `createStrait`. Pure Dart: the app hands it the
@@ -261,7 +264,9 @@ class StraitLinks {
     } catch (_) {
       flag = '1';
     }
-    final firstLaunch = flag != '1';
+    // Web builds (Flutter web) have no install: never a first launch, so no
+    // deferred check and no open counted as an install.
+    final firstLaunch = !_onWeb && flag != '1';
     _firstLaunch = firstLaunch;
     if (initialUrl != null && initialUrl.isNotEmpty) {
       // Opened by a link on first launch = the user's intent right now: no
