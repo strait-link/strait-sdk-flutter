@@ -84,7 +84,7 @@ Or pin it in `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  strait_sdk: ^0.9.4
+  strait_sdk: ^0.9.5
 ```
 
 Pure Dart (no Flutter dependency), so it works in Flutter apps and Dart servers alike.
@@ -525,6 +525,16 @@ dart pub get && dart test
 SDKs; `test/client_test.dart` covers the client scenarios with a fake engine and
 fake lifecycle; `test/opens_test.dart` covers open reporting (B14);
 `test/doctor_test.dart` covers every `doctor()` finding (B23).
+
+## Size and speed
+
+Measured 25 Oct 2026 on 0.9.5.
+
+| What | Size or time | How it was measured |
+|---|---|---|
+| pub.dev package | 43 KB archive | `dart pub publish --dry-run` |
+| In your app | 15 KB of AOT code for the SDK, plus 68 KB for `http` and its dependencies (most apps already have `http`) | `dart compile aot-snapshot --print-instructions-sizes-to` |
+| Start-up on the UI isolate | 0.03 ms for `StraitLinks(...)` + 0.03 ms for the synchronous part of `start()`. 0.9.4 took 0.41 ms in `StraitLinks(...)`, nearly all of it the isolate's first `RegExp` | `dart compile exe` (AOT, like a release app), macOS arm64, a fresh process each run, median of 15 |
 
 ## Example app
 

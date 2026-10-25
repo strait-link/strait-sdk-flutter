@@ -106,13 +106,57 @@ String _decode(String s) {
 /// else (blank, paths, spaces) is ignored.
 List<String> normalizeLinkHosts(String endpoint, [List<String> linkHosts = const []]) {
   final out = <String>[];
-  final bare = RegExp(r'^[a-z0-9.-]+(:\d+)?$', caseSensitive: false);
   for (final h in [endpoint, ...linkHosts]) {
     final t = h.trim();
-    final host = splitUrl(h)?.host ?? (bare.hasMatch(t) ? t.toLowerCase() : null);
+    final host = _schemeHost(t) ?? (_isBareHost(t) ? t.toLowerCase() : null);
     if (host != null && !out.contains(host)) out.add(host);
   }
   return out;
+}
+
+// normalizeLinkHosts and trimTrailingSlashes run in the StraitLinks constructor, on the UI isolate
+// at app start. An isolate's first RegExp costs ~0.2-0.5 ms, so these are plain ASCII scans with
+// the same rules as the regexes they replace (H3).
+bool _asciiLetter(int c) => (c | 0x20) >= 0x61 && (c | 0x20) <= 0x7a;
+bool _asciiDigit(int c) => c >= 0x30 && c <= 0x39;
+
+/// `splitUrl(u)?.host`: the lower-cased host of `scheme://host…`, or null when `u` has no scheme.
+String? _schemeHost(String u) {
+  if (u.isEmpty || !_asciiLetter(u.codeUnitAt(0))) return null;
+  var i = 1;
+  while (i < u.length && (_asciiLetter(u.codeUnitAt(i)) || _asciiDigit(u.codeUnitAt(i)) || '+.-'.contains(u[i]))) {
+    i++;
+  }
+  if (!u.startsWith('://', i)) return null;
+  var end = i + 3;
+  while (end < u.length && !'/?#'.contains(u[end])) {
+    end++;
+  }
+  return u.substring(i + 3, end).toLowerCase();
+}
+
+/// `^[a-z0-9.-]+(:\d+)?$`, case-insensitive.
+bool _isBareHost(String t) {
+  var i = 0;
+  while (i < t.length && (_asciiLetter(t.codeUnitAt(i)) || _asciiDigit(t.codeUnitAt(i)) || t[i] == '.' || t[i] == '-')) {
+    i++;
+  }
+  if (i == 0) return false;
+  if (i == t.length) return true;
+  if (t[i] != ':' || i + 1 == t.length) return false;
+  for (var j = i + 1; j < t.length; j++) {
+    if (!_asciiDigit(t.codeUnitAt(j))) return false;
+  }
+  return true;
+}
+
+/// `s.replaceAll(RegExp(r'/+$'), '')`.
+String trimTrailingSlashes(String s) {
+  var end = s.length;
+  while (end > 0 && s.codeUnitAt(end - 1) == 0x2f) {
+    end--;
+  }
+  return s.substring(0, end);
 }
 
 /// The `strait_link` id inside a Play Install Referrer string, or null.
