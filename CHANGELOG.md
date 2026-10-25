@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.5
+
+- Faster start-up: `StraitLinks(...)` no longer builds a `RegExp`. An isolate's first `RegExp` made the
+  constructor take 0.41 ms on the UI isolate; it now takes 0.03 ms (the trailing-slash trim and the
+  link-host checks are plain ASCII scans with the same rules, tested against the old RegExp code).
+  No API or behaviour change.
+- README: a "Size and speed" table (package and AOT size, start-up time, how each was measured).
+
 ## 0.9.4
 
 - New: `links.doctor({appId, certSha256})`, a setup check for debug builds (contract B23, shared-spec
