@@ -1,3 +1,9 @@
+@TestOn('vm')
+library;
+
+// Install paths (deferred check, first launch): VM only. Web builds have no
+// install, so StraitLinks skips them there (test/web_test.dart).
+
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;

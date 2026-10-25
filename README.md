@@ -67,6 +67,7 @@ curl -s https://<your-handle>.strait.link/v1/resolve -H 'Content-Type: applicati
 | Android: direct links and deferred links | ● Live | App Links, custom schemes, Play Install Referrer. |
 | iPhone links (Universal Links) | ● Live | The links themselves (Apple's Universal Links plus our association file) were proven on a real iPhone with the Swift reference app on 21 Oct 2026. This SDK's iOS glue is covered by unit tests and hasn't run on a real iPhone. |
 | iPhone: install matching (deferred links) | Opt-in | Off until you choose it. Proven on iPhone simulators; the real-iPhone run waits on our App Store listing. Your choice in Dashboard → Settings → iPhone installs: device matching, paste handoff, both or neither, read from Strait at runtime. Device matching is off by default. iPhone matches are labelled Estimated until measured. |
+| Flutter web | New | Same code. There is no install on the web, so no deferred check runs and no visit counts as an install; a link in the page URL (`AppLinks().getInitialLink()`) opens, is reported and attributes events. The test suite runs in Chrome (dart2js and dart2wasm) in CI. |
 | Store sheet: the store inside your app | New | Keeps the deep link through the install. On iPhone it needs your app's App Store ID. |
 | Published on pub.dev | ● Live | `dart pub add strait_sdk` (Flutter: `flutter pub add strait_sdk`). |
 
@@ -84,7 +85,7 @@ Or pin it in `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  strait_sdk: ^0.9.5
+  strait_sdk: ^0.9.6
 ```
 
 Pure Dart (no Flutter dependency), so it works in Flutter apps and Dart servers alike.
@@ -102,11 +103,11 @@ the app state, runs the deferred check once per install, and emits one
 
 ```dart
 import 'dart:async';
-import 'dart:io' show Platform;
 import 'dart:ui';
 
 import 'package:app_links/app_links.dart';
 import 'package:strait_sdk/strait_sdk.dart';
+import 'package:flutter/foundation.dart'; // kIsWeb, defaultTargetPlatform (dart:io's Platform throws on the web)
 import 'package:flutter/widgets.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:play_install_referrer/play_install_referrer.dart';
@@ -142,10 +143,13 @@ Future<StraitLinks> startStrait() async {
     publishableKey: 'st_pub_live_…', // Dashboard → Get started
     endpoint: 'https://<your-handle>.strait.link',
     linkHosts: const ['links.yourbrand.com'], // extra custom domains (coming soon), if any
-    platform: Platform.isIOS ? 'ios' : Platform.isAndroid ? 'android' : 'other',
+    platform: kIsWeb
+        ? 'other'
+        : switch (defaultTargetPlatform) { TargetPlatform.iOS => 'ios', TargetPlatform.android => 'android', _ => 'other' },
     storage: PrefsStore(await SharedPreferences.getInstance()),
-    installReferrer: () async =>
-        Platform.isAndroid ? (await PlayInstallReferrer.installReferrer).installReferrer : null,
+    installReferrer: () async => !kIsWeb && defaultTargetPlatform == TargetPlatform.android
+        ? (await PlayInstallReferrer.installReferrer).installReferrer
+        : null,
     deviceFields: () {
       final view = PlatformDispatcher.instance.views.first;
       return DeviceFields(

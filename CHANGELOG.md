@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.9.6
+
+- Flutter web: a web build has no install, so `StraitLinks.start()` no longer runs the
+  once-per-install deferred check there (0.9.5 and earlier sent `/v1/match` on every first visit, which the
+  engine recorded as an install), and an open from the page URL is never reported as a first
+  launch. A link in the page URL still opens, is reported and attributes events. Detected at
+  compile time (`dart.library.js_interop`, the same test as Flutter's `kIsWeb`); apps change nothing.
+  `checkDeferred()` still asks when called.
+- README: the `StraitLinks` example uses `kIsWeb` / `defaultTargetPlatform` instead of
+  `dart:io`'s `Platform`, which throws on the web.
+- CI runs the whole suite in Chrome too (dart2js and dart2wasm); the shared vectors load there
+  through `test/support/fixture.dart`. Install-path tests are VM only.
+
 ## 0.9.5
 
 - Faster start-up: `StraitLinks(...)` no longer builds a `RegExp`. An isolate's first `RegExp` made the
