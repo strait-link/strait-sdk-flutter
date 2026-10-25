@@ -1,9 +1,9 @@
 # Changelog
 
-## 0.9.5
+## 0.9.6
 
 - Flutter web: a web build has no install, so `StraitLinks.start()` no longer runs the
-  once-per-install deferred check there (0.9.4 sent `/v1/match` on every first visit, which the
+  once-per-install deferred check there (0.9.5 and earlier sent `/v1/match` on every first visit, which the
   engine recorded as an install), and an open from the page URL is never reported as a first
   launch. A link in the page URL still opens, is reported and attributes events. Detected at
   compile time (`dart.library.js_interop`, the same test as Flutter's `kIsWeb`); apps change nothing.
@@ -12,6 +12,14 @@
   `dart:io`'s `Platform`, which throws on the web.
 - CI runs the whole suite in Chrome too (dart2js and dart2wasm); the shared vectors load there
   through `test/support/fixture.dart`. Install-path tests are VM only.
+
+## 0.9.5
+
+- Faster start-up: `StraitLinks(...)` no longer builds a `RegExp`. An isolate's first `RegExp` made the
+  constructor take 0.41 ms on the UI isolate; it now takes 0.03 ms (the trailing-slash trim and the
+  link-host checks are plain ASCII scans with the same rules, tested against the old RegExp code).
+  No API or behaviour change.
+- README: a "Size and speed" table (package and AOT size, start-up time, how each was measured).
 
 ## 0.9.4
 
