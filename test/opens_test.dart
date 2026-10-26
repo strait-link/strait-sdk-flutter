@@ -9,7 +9,9 @@ import 'package:strait_sdk/src/core.dart';
 
 // Contract B14: every link open is reported exactly once, retried until it
 // gets through, and never delays navigation. Plus the B6/B7 revisions.
-// Port of sdk-react-native/test/opens.test.ts.
+// Port of sdk-react-native/test/opens.test.ts. App opens: on the web only a
+// landing that carries a tap id is reported (test/web_test.dart), so the
+// report tests below run on the VM.
 
 const pk = 'st_pub_test_appowner01';
 const endpoint = 'https://links.test';
@@ -131,7 +133,7 @@ class BrokenStore implements KeyValueStore {
 MemoryStore returning() => MemoryStore()..data['strait.deferredChecked'] = '1';
 
 void main() {
-  group('browser hand-off (custom scheme) with a tap id', () {
+  group('browser hand-off (custom scheme) with a tap id', testOn: 'vm', () {
     test('reports the open with its tap id; the app never sees the tap id', () async {
       final phone = FakePhone();
       final engine = FakeEngine({'/v1/open': accepted});
@@ -184,7 +186,7 @@ void main() {
     });
   });
 
-  group('short link (verified App Link from WhatsApp/Gmail): the lookup is the report', () {
+  group('short link (verified App Link from WhatsApp/Gmail): the lookup is the report', testOn: 'vm', () {
     test('sends openId + app state with /v1/resolve, and nothing else once recorded', () async {
       final engine = FakeEngine({'/v1/resolve': resolved, '/v1/open': accepted});
       final h = make(FakePhone(), engine, returning());
@@ -244,7 +246,7 @@ void main() {
     });
   });
 
-  group('the retry queue', () {
+  group('the retry queue', testOn: 'vm', () {
     test('keeps reports on 5xx / 429, drops them on 4xx', () async {
       final phone = FakePhone();
       final engine = FakeEngine({'/v1/open': const Reply(503)});
@@ -315,7 +317,7 @@ void main() {
   group('B18: no query or fragment leaves the device or reaches storage', () {
     const tapKey = 'strait.lastTap';
     const day = 24 * 3600 * 1000;
-    test('the /v1/open report keeps only host, path and utm_source; the app still gets the full URL', () async {
+    test('the /v1/open report keeps only host, path and utm_source; the app still gets the full URL', testOn: 'vm', () async {
       final phone = FakePhone();
       final engine = FakeEngine({'/v1/open': accepted});
       final h = make(phone, engine, returning());
@@ -327,7 +329,7 @@ void main() {
       expect(e.params, {'email': 'jo@hilltop.example', 'utm_source': 'sms'});
       expect(engine.of('/v1/open').first.body!['url'], 'https://shop.example/p/42?utm_source=sms');
     });
-    test('a failed short-link lookup is queued and resolved without its query or fragment', () async {
+    test('a failed short-link lookup is queued and resolved without its query or fragment', testOn: 'vm', () async {
       final phone = FakePhone();
       final engine = FakeEngine({'/v1/resolve': offline, '/v1/open': offline});
       final h = make(phone, engine, returning());

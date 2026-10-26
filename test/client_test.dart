@@ -555,7 +555,7 @@ void main() {
       expect(eventBody(h.engine)!['clickId'], tap);
     });
 
-    test('a newer short-link open with no tap id in the reply (older engine) forgets the older tap', () async {
+    test('a newer short-link open with no tap id in the reply (older engine) forgets the older tap', testOn: 'vm', () async {
       final h = make(FakeEngine({...resolved, '/v1/event': {'ok': true}, '/v1/open': {'ok': true}}));
       await h.start(initialUrl: 'straitlink://shop.example/p/42?strait_click=$tap');
       await h.strait.handleUrl('https://links.test/sale');
@@ -563,7 +563,7 @@ void main() {
       expect(eventBody(h.engine)!.containsKey('clickId'), isFalse);
     });
 
-    test('B16: a short-link open remembers the tap id the engine returns, replacing the older tap', () async {
+    test('B16: a short-link open remembers the tap id the engine returns, replacing the older tap', testOn: 'vm', () async {
       final store = MemoryStore();
       final h = make(
           FakeEngine({
@@ -602,7 +602,7 @@ void main() {
       expect(eventBody(h.engine)!['clickId'], tap);
     });
 
-    test('B16: a malformed reply tap id counts as none (forgets)', () async {
+    test('B16: a malformed reply tap id counts as none (forgets)', testOn: 'vm', () async {
       final h = make(FakeEngine({
         '/v1/resolve': {...resolved['/v1/resolve']!, 'clickId': 'nope'},
         '/v1/event': {'ok': true},
@@ -662,7 +662,7 @@ void main() {
       expect(e.linkId, 'lnk_7');
     });
 
-    test('a page.link long link opens its link= destination with no lookup', () async {
+    test('a page.link long link opens its link= destination with no lookup', testOn: 'vm', () async {
       final h = makePageLink(FakeEngine({
         '/v1/open': {'ok': true}
       }));

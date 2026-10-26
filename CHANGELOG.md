@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- Flutter web: web opens are counted only for landings from a Strait tap. A page URL that carries
+  a valid `strait_click` (the tap id the engine appends when it sends a tap to the web) sends one
+  `/v1/open` (platform `web`, joined to the tap, openId `web-<tap id>` so a reload or a shared
+  landing URL is de-duplicated by the engine) and attributes later events to that tap. Any other
+  page URL still reaches `onLink` for routing but is not reported (0.9.6 reported every page load
+  with a URL as a link open, so web "opens" were page views). A short link handed to `handleUrl` on
+  the web is looked up without an openId, so it is not counted either. Needs an engine that adds
+  web tap ids. Apps and native builds change nothing.
+
 ## 0.9.6
 
 - Flutter web: a web build has no install, so `StraitLinks.start()` no longer runs the
