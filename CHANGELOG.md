@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.9.7
 
 - Flutter web: web opens are counted only for landings from a Strait tap. A page URL that carries
   a valid `strait_click` (the tap id the engine appends when it sends a tap to the web) sends one
