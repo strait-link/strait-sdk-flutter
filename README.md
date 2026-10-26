@@ -85,7 +85,7 @@ Or pin it in `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  strait_sdk: ^0.9.6
+  strait_sdk: ^0.9.7
 ```
 
 Pure Dart (no Flutter dependency), so it works in Flutter apps and Dart servers alike.
