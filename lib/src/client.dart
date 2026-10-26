@@ -308,6 +308,8 @@ class StraitLinks {
       // The lookup is also the open report (openId); the engine says whether
       // it recorded it, and anything short of that is retried via /v1/open.
       // B18: only host + path (+ utm_source) leave the device or reach storage.
+      // Web: a lookup only (no openId, so the engine records nothing); a web
+      // open is counted only for a landing that carries a tap id (below).
       final sent = reportUrl(raw);
       final base = <String, dynamic>{
         'openId': id, 'kind': 'direct', 'route': 'app_link', 'appState': state.name,
@@ -318,7 +320,7 @@ class StraitLinks {
           'publishableKey': publishableKey,
           'url': sent,
           'platform': platform,
-          'openId': id,
+          if (!_onWeb) 'openId': id,
           'appState': state.name,
           'firstLaunch': firstLaunch,
           'at': t0,
@@ -327,8 +329,8 @@ class StraitLinks {
         final matched = r.json['matched'] == true;
         final reason = matched ? null : (_str(r.json['reason']) ?? _str(r.json['error']));
         final linkId = _str(r.json['linkId']);
-        if (matched) _noteTap(replyClickId(r.json['clickId']), t0);
-        if (r.json['recorded'] != true) {
+        if (matched && !_onWeb) _noteTap(replyClickId(r.json['clickId']), t0);
+        if (!_onWeb && r.json['recorded'] != true) {
           unawaited(_report({
             ...base,
             'matched': matched,
@@ -344,7 +346,7 @@ class StraitLinks {
           linkId: linkId, ms: _now() - t0, at: t0,
         ));
       } catch (_) {
-        unawaited(_enqueue({...base, 'reason': 'network'}));
+        if (!_onWeb) unawaited(_enqueue({...base, 'reason': 'network'}));
         return _emit(LinkEvent(
           id: id, kind: LinkKind.direct, route: LinkRoute.appLink, appState: state,
           rawUrl: raw, matched: false, reason: 'network', ms: _now() - t0, at: t0,
@@ -352,13 +354,20 @@ class StraitLinks {
       }
     }
     if (c.clickId != null) _noteTap(c.clickId, t0);
-    // Navigation never waits for the report.
-    unawaited(_report({
-      'openId': id, 'kind': 'direct', 'route': c.route.value, 'appState': state.name,
-      'platform': platform, 'url': c.url == null ? null : reportUrl(c.url!),
-      if (c.clickId != null) 'clickId': c.clickId,
-      'matched': true, 'firstLaunch': firstLaunch, 'at': t0,
-    }));
+    // Web: the page URL is an open only when it carries the tap id the engine
+    // appends when it sends a tap to the web (`strait_click`); one open per tap
+    // (openId `web-<tap>`), so a reload or a shared landing URL is de-duplicated
+    // by the engine. Any other page URL is a page view: routed, never reported.
+    if (!_onWeb || c.clickId != null) {
+      // Navigation never waits for the report.
+      unawaited(_report({
+        'openId': _onWeb ? 'web-${c.clickId}' : id, 'kind': 'direct', 'route': c.route.value,
+        'appState': state.name, 'platform': _onWeb ? 'web' : platform,
+        'url': c.url == null ? null : reportUrl(c.url!),
+        if (c.clickId != null) 'clickId': c.clickId,
+        'matched': true, 'firstLaunch': firstLaunch, 'at': t0,
+      }));
+    }
     return _emit(LinkEvent(
       id: id, kind: LinkKind.direct, route: c.route, appState: state, rawUrl: raw,
       matched: true, url: c.url, path: c.path, params: c.params, ms: _now() - t0, at: t0,
