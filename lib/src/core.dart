@@ -391,6 +391,31 @@ String newOpenId(int now, [double Function()? random]) {
   return 'o_${now.toRadixString(36)}_$r';
 }
 
+/// A unique id for one conversion event when the app gives none (contract
+/// B13a): the engine stores an eventId once, so a retried send is never
+/// counted twice. Same shape as [newOpenId].
+String newEventId(int now, [double Function()? random]) => 'e${newOpenId(now, random).substring(1)}';
+
+/// What `start()` does with the once-per-install flag (contract B6a, shared-spec ADR 0003):
+/// [firstLaunch] = run the deferred check / count this launch as the install's first;
+/// [clearFlag] = set `strait.deferredChecked` to '' first (the storage came back from
+/// another install); then write [storeInstallTime] to `strait.installTime` (null = leave it).
+typedef FirstLaunchState = ({bool firstLaunch, bool clearFlag, String? storeInstallTime});
+
+/// B6a: storage restored from a backup of another install (Android Auto Backup, a restored
+/// phone) brings back `strait.deferredChecked`. The app's install time, stored next to it,
+/// tells: a different stored time = a new install, so the check runs again. No stored time
+/// (an app updated from an older SDK) = adopt it, never a new install. Unknown install time
+/// (null, 0, negative, not finite) = the B6 rule alone.
+FirstLaunchState firstLaunchState(String? flag, String? storedInstallTime, num? installTime) {
+  final t = installTime != null && installTime.isFinite && installTime >= 1 ? '${installTime.truncate()}' : null;
+  final stored = storedInstallTime == null || storedInstallTime.isEmpty ? null : storedInstallTime;
+  if (flag != '1') return (firstLaunch: true, clearFlag: false, storeInstallTime: t != null && t != stored ? t : null);
+  if (t == null || t == stored) return (firstLaunch: false, clearFlag: false, storeInstallTime: null);
+  if (stored == null) return (firstLaunch: false, clearFlag: false, storeInstallTime: t);
+  return (firstLaunch: true, clearFlag: true, storeInstallTime: t);
+}
+
 /// A link arriving this soon after the app came back to the front came "from background".
 const resumeWindowMs = 2000;
 

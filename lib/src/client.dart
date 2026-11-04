@@ -136,6 +136,7 @@ class LinkStart {
 const _deferredFlag = 'strait.deferredChecked';
 const _queueKey = 'strait.pendingOpens';
 const _tapKey = 'strait.lastTap';
+const _installTimeKey = 'strait.installTime';
 
 /// True in a web build (dart2js and dart2wasm), the same test as Flutter's `kIsWeb`.
 const bool _onWeb = bool.fromEnvironment('dart.library.js_interop');
@@ -156,6 +157,7 @@ class StraitLinks {
   final List<String> _linkHosts;
   final KeyValueStore _storage;
   final Future<String?> Function()? _installReferrer;
+  final Future<int?> Function()? _installTime;
   final DeviceFields Function() _device;
   final http.Client _http;
   final bool _ownsHttp;
@@ -187,6 +189,7 @@ class StraitLinks {
     List<String> linkHosts = const [],
     KeyValueStore? storage,
     Future<String?> Function()? installReferrer,
+    Future<int?> Function()? installTime,
     http.Client? client,
     int Function()? now,
     @Deprecated('Ignored: the workspace setting (Dashboard Settings -> iPhone installs) decides at runtime.')
@@ -199,6 +202,7 @@ class StraitLinks {
         _linkHosts = normalizeLinkHosts(trimTrailingSlashes(endpoint), linkHosts),
         _storage = storage ?? MemoryStore(),
         _installReferrer = installReferrer,
+        _installTime = installTime,
         _device = deviceFields,
         _http = client ?? http.Client(),
         _ownsHttp = client == null,
@@ -255,17 +259,33 @@ class StraitLinks {
         if (!echo) handleUrl(u);
       }, onError: (_) {}));
     }
-    // Unreadable storage counts as "already checked": never risk a stale
-    // deferred jump on every launch. Write failures are ignored (never throw).
-    String? flag;
-    try {
-      flag = await _storage.get(_deferredFlag);
-    } catch (_) {
-      flag = '1';
-    }
     // Web builds (Flutter web) have no install: never a first launch, so no
     // deferred check and no open counted as an install.
-    final firstLaunch = !_onWeb && flag != '1';
+    var firstLaunch = false;
+    if (!_onWeb) {
+      // Unreadable storage counts as "already checked": never risk a stale
+      // deferred jump on every launch. Write failures are ignored (never throw).
+      String? flag;
+      try {
+        flag = await _storage.get(_deferredFlag);
+      } catch (_) {
+        flag = '1';
+      }
+      // B6a: the install time stored with the flag tells a restored backup of
+      // another install from this one (then the check runs again).
+      String? stored;
+      try {
+        stored = await _storage.get(_installTimeKey);
+      } catch (_) {}
+      int? installed;
+      try {
+        installed = await _installTime?.call();
+      } catch (_) {}
+      final s = firstLaunchState(flag, stored, installed);
+      if (s.clearFlag) await _write(_deferredFlag, '');
+      if (s.storeInstallTime != null) await _write(_installTimeKey, s.storeInstallTime!);
+      firstLaunch = s.firstLaunch;
+    }
     _firstLaunch = firstLaunch;
     if (initialUrl != null && initialUrl.isNotEmpty) {
       // Opened by a link on first launch = the user's intent right now: no
@@ -280,9 +300,11 @@ class StraitLinks {
     unawaited(flushOpenReports());
   }
 
-  Future<void> _setFlag() async {
+  Future<void> _setFlag() => _write(_deferredFlag, '1');
+
+  Future<void> _write(String key, String value) async {
     try {
-      await _storage.set(_deferredFlag, '1');
+      await _storage.set(key, value);
     } catch (_) {}
   }
 
@@ -619,9 +641,16 @@ class StraitLinks {
         await _writeQueue(pruneOpenQueue([...await _readQueue(), report], _now()));
       });
 
-  /// POST /v1/open; the HTTP status, or null when there was no answer.
+  /// POST /v1/open (or /v1/event for a saved event, B13a); the HTTP status,
+  /// or null when there was no answer.
   Future<int?> _sendReport(Map<String, dynamic> report) async {
     try {
+      if (report['type'] == 'event') {
+        final event = {'publishableKey': publishableKey, ...report}
+          ..remove('type')
+          ..remove('at');
+        return (await _call('POST', '/v1/event', event)).status;
+      }
       // B14: deviceClass is added at send time, never saved in the queue.
       return (await _call('POST', '/v1/open', {'publishableKey': publishableKey, ...report, ..._deviceClassField()}))
           .status;
@@ -630,17 +659,19 @@ class StraitLinks {
     }
   }
 
-  /// Report an open now; keep it for retry if it doesn't get through.
-  Future<void> _report(Map<String, dynamic> report) async {
+  /// Report an open (or an event) now; keep it for retry if it doesn't get
+  /// through. The HTTP status, or null when there was no answer.
+  Future<int?> _report(Map<String, dynamic> report) async {
     final status = await _sendReport(report);
     if (shouldRetryReport(status)) {
       await _enqueue(report);
     } else {
       unawaited(flushOpenReports()); // the network works: send anything saved earlier
     }
+    return status;
   }
 
-  /// Open reports saved while offline, waiting to be sent (debugging).
+  /// Open reports and events saved while offline, waiting to be sent (debugging).
   Future<int> pendingOpenReports() => _serial(() async => (await _readQueue()).length);
 
   /// Send saved open reports now (also happens on start and on resume).
@@ -727,26 +758,35 @@ class StraitLinks {
 
   /// Conversion / revenue event. Resolves true when accepted. Never throws.
   /// Carries the tap id of the last attributed link open (≤7 days, contract
-  /// B15) unless you pass [clickId] yourself.
+  /// B15) unless you pass [clickId] yourself. Pass your order id as [eventId]:
+  /// the engine stores each eventId once (else the SDK makes one). False = not
+  /// accepted now; when the network or the server was the reason, the event is
+  /// kept and sent later with the open reports (contract B13a).
   Future<bool> trackEvent(String name,
-      {num? value, String? currency, String? linkId, String? clickId}) async {
+      {num? value, String? currency, String? linkId, String? clickId, String? eventId}) async {
     try {
       await _tapWrite;
       String? stored;
       try {
         stored = await _storage.get(_tapKey);
       } catch (_) {}
-      if (staleTap(stored, _now())) _dropStaleTap(_now());
-      final tap = eventClickId(stored, _now(), clickId);
-      return (await _call('POST', '/v1/event', {
-        'publishableKey': publishableKey,
+      final at = _now();
+      if (staleTap(stored, at)) _dropStaleTap(at);
+      final tap = eventClickId(stored, at, clickId);
+      // B13a: built once (tap id chosen now), with an eventId so a retry is
+      // stored once. Saved for retry without the publishable key.
+      final status = await _report({
+        'type': 'event',
+        'at': at,
         'event': name,
         'platform': platform,
+        'eventId': eventId == null || eventId.isEmpty ? newEventId(at) : eventId,
         if (value != null) 'value': value,
         if (currency != null) 'currency': currency,
         if (linkId != null) 'linkId': linkId,
         if (tap != null) 'clickId': tap,
-      })).ok;
+      });
+      return status != null && status >= 200 && status < 300;
     } catch (_) {
       return false;
     }

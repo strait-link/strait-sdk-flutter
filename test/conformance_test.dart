@@ -24,6 +24,25 @@ void main() async {
     ]));
   });
 
+  test('vectors v10', () {
+    expect(v['version'], 10);
+  });
+
+  group('firstLaunchState (B6a)', () {
+    for (final c in v['firstLaunchState'] as List) {
+      test('${c['name']}', () {
+        final e = c['expected'] as Map<String, dynamic>;
+        expect(
+            firstLaunchState(c['flag'] as String?, c['stored'] as String?, c['installTime'] as num?),
+            (
+              firstLaunch: e['firstLaunch'] as bool,
+              clearFlag: e['clearFlag'] as bool,
+              storeInstallTime: e['storeInstallTime'] as String?,
+            ));
+      });
+    }
+  });
+
   group('eventClickId (B15)', () {
     for (final c in v['eventClickId'] as List) {
       test('${c['name']}', () {

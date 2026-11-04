@@ -98,7 +98,8 @@ the app state, runs the deferred check once per install, and emits one
 `LinkEvent` for every case. Typical wiring with
 [`app_links`](https://pub.dev/packages/app_links),
 [`shared_preferences`](https://pub.dev/packages/shared_preferences),
-[`play_install_referrer`](https://pub.dev/packages/play_install_referrer) and
+[`play_install_referrer`](https://pub.dev/packages/play_install_referrer),
+[`package_info_plus`](https://pub.dev/packages/package_info_plus) and
 [`flutter_timezone`](https://pub.dev/packages/flutter_timezone):
 
 ```dart
@@ -110,6 +111,7 @@ import 'package:strait_sdk/strait_sdk.dart';
 import 'package:flutter/foundation.dart'; // kIsWeb, defaultTargetPlatform (dart:io's Platform throws on the web)
 import 'package:flutter/widgets.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:play_install_referrer/play_install_referrer.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -150,6 +152,8 @@ Future<StraitLinks> startStrait() async {
     installReferrer: () async => !kIsWeb && defaultTargetPlatform == TargetPlatform.android
         ? (await PlayInstallReferrer.installReferrer).installReferrer
         : null,
+    // Reinstalls from a link (see "Reinstalls and backups"): the app's install time, epoch ms.
+    installTime: () async => (await PackageInfo.fromPlatform()).installTime?.millisecondsSinceEpoch,
     deviceFields: () {
       final view = PlatformDispatcher.instance.views.first;
       return DeviceFields(
@@ -193,7 +197,12 @@ Notes:
 
 - `app_links` 6+ also emits the launch link on `uriLinkStream`; `start()`
   ignores that first echo, so the launch link is handled once.
-- Analytics: `strait.trackEvent('purchase', value: 49.99, currency: 'USD', linkId: e.linkId)`.
+- Analytics: `strait.trackEvent('purchase', value: 49.99, currency: 'USD', eventId: order.id)`.
+  `eventId` is your id for the conversion (your order id; 1-64 of `A-Z a-z 0-9 _ . : -`): Strait
+  stores each one once, so a retry or a second report of the same order never counts twice. Left
+  out, the SDK makes one. An event that can't be sent (offline, server busy: no answer, 429 or 5xx)
+  is kept with the saved open reports and sent later, for up to 7 days; `trackEvent` then returns
+  `false`, and `pendingOpenReports()` counts it (contract B13a). Refunds are not supported yet.
   The event carries the tap id of the last attributed link open for 7 days, so
   the dashboard can place revenue on that tap's channel and A/B variant
   (B15/B16). Every attributed open supplies one: a browser hand-off, a Play
@@ -202,8 +211,21 @@ Notes:
 - Fingerprint debug: `strait.reportFingerprint()` then `strait.compareFingerprint()`.
 - `strait.checkDeferred()` re-runs the deferred check (debugging); it doesn't
   touch the once-per-install flag and never records an install.
+- `PackageInfo.installTime` needs `package_info_plus` 8.1 or later; it is null where the
+  platform can't tell, and the SDK then keeps the once-per-install flag alone.
 - `flutter_timezone` 5.0 and later returns a `TimezoneInfo` (hence `.identifier`);
   4.x and earlier return the `String` itself, so drop `.identifier` there.
+
+### Reinstalls and backups (`installTime`, contract B6a)
+
+Android backs up app storage (Auto Backup, on by default) and puts it back when the app is installed
+again, on the same phone or a new one; restored iPhones bring it back too. Without `installTime` the
+restored "deferred check done" flag (`strait.deferredChecked`) makes a reinstall from a link skip its
+deferred link and go uncounted. With it, the SDK stores the install time next to the flag
+(`strait.installTime`) and runs the check again when the install time changed. An app update keeps
+its install time, so it never counts as a new install, and an app updated from an older SDK adopts
+the time without a new check. Optional extra on Android: exclude the `shared_preferences` file
+(`FlutterSharedPreferences.xml`) from backup in your `dataExtractionRules` / `fullBackupContent`.
 
 ### Old Firebase page.link links (contract B22)
 
@@ -370,11 +392,13 @@ the Strait SDK contract:
 B1 (publishableKey on every call) · B2 (`browserScreenWidth`) · B3 (short links
 → `/v1/resolve`, engine reason reported) · B4 (`classifyUrl`, tap id removed via
 `takeClickId`) · B5 (`AppStateTracker`) · B6 (once per install,
-skipped-but-marked on a link launch, marked only once the engine answered) ·
+skipped-but-marked on a link launch, marked only once the engine answered) · B6a (reinstall-safe
+first open: `installTime`, `strait.installTime`, `firstLaunchState`) ·
 B7 (Install Referrer → `/v1/referrer` with `parseStraitClick`, else
 `/v1/match`) · B8 (iOS `/v1/match`) · B9 (one `LinkEvent` type, replay,
 `onLinkStart`) · B10 (never throws) · B11 (`jsonEncode`) · B12 (`splitUrl`, no
-`Uri` parsing) · B13 (`trackEvent`, `reportFingerprint`, `compareFingerprint`)
+`Uri` parsing) · B13 (`trackEvent`, `reportFingerprint`, `compareFingerprint`) · B13a (`trackEvent` `eventId`,
+`newEventId`, events kept in the open-report queue)
 · B14 (every open reported once, `strait.pendingOpens` retry queue,
 `pendingOpenReports`, `flushOpenReports`, `deviceClass` / `deviceClassForSize`) · B15 (events carry the remembered
 tap id, `strait.lastTap`, `eventClickId`) · B16 (the tap id from the
@@ -385,7 +409,7 @@ taps are deleted, `staleTap`) · B19 (iPhone paste handoff, chosen in the dashbo
 `parseHandoffUrl`, `/v1/handoff/claim`, `claimHandoff`) · B22 (old Firebase
 page.link links: short → `/v1/resolve`, long → `link=` read on the device) · B23
 (`doctor()` setup check, `doctorFindings`). Both
-shared vector files (conformance v8) are asserted in `dart test`.
+shared vector files (conformance v10) are asserted in `dart test`.
 
 ## iPhone deferred links (opt-in): you choose the method (B19)
 
