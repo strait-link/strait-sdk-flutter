@@ -215,10 +215,11 @@
 ## 0.5.0
 
 - **Breaking: renamed to Strait.** The package is now `strait_sdk`
-  (`import 'package:strait_sdk/strait_sdk.dart';`). `StraitLinks`, `parseStraitLink`, `parseStraitClick`; `lib/src/strait.dart`.
+  (`import 'package:strait_sdk/strait_sdk.dart';`). New names: `StraitLinks`,
+  `parseStraitLink`, `parseStraitClick`; source in `lib/src/strait.dart`.
 - **Breaking (clean break, no aliases):** wire params are now `strait_click`
-  and `strait_link` (Play Install Referrer and hand-off URLs); the old
-  `strait_*` names are no longer read. Storage keys are now `strait.*`
+  and `strait_link` (Play Install Referrer and hand-off URLs); the params
+  from before the rename are no longer read. Storage keys are now `strait.*`
   (`strait.deferredChecked`, `strait.pendingOpens`); values saved under the
   old keys are ignored, so a deferred link may be checked once more after
   upgrading.
