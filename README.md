@@ -203,6 +203,7 @@ Notes:
   out, the SDK makes one. An event that can't be sent (offline, server busy: no answer, 429 or 5xx)
   is kept with the saved open reports and sent later, for up to 7 days; `trackEvent` then returns
   `false`, and `pendingOpenReports()` counts it (contract B13a). Refunds are not supported yet.
+  Revenue you must trust (billing, payouts) belongs on your server with the secret key: the app's publishable key is public, so anyone who can guess an order id could send it first.
   The event carries the tap id of the last attributed link open for 7 days, so
   the dashboard can place revenue on that tap's channel and A/B variant
   (B15/B16). Every attributed open supplies one: a browser hand-off, a Play
