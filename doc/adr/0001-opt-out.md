@@ -69,3 +69,12 @@ posted `/v1/match`, which records an install. It now takes `storage` (the one pa
 returns `MatchResult.none` with no call while `strait.enabled` is `'0'` there. Unreadable storage counts as on,
 as in `StraitLinks`. Without `storage` it can't read the switch (the `StraitLinks` default is in memory); the
 README says to pass it. Same fix as React Native (its ADR 0002) and Swift.
+
+## Update 5 Nov 2026: follow-up F7, the iPhone clipboard
+Switched off while the first-launch check was out (after `/v1/match` answered with paste handoff on), the SDK
+still read the clipboard, which shows iOS's paste prompt to a person who just said no; the claim itself was
+already refused by the gate. The switch is now checked before the prompt-free detect and again between the
+detect and the read (the read is what prompts). Found in the Unity port's review (`ops/run-1105/sdk-optout-2.md`).
+The check then ends with the `/v1/match` answer (`no_match`) and is marked done: that request left while the SDK
+was on and the engine already counted the install, so switching back on does not send a second match for the
+same install (the paste step is not retried for it).
