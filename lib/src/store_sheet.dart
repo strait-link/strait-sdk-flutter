@@ -4,7 +4,7 @@
 ///
 ///  1. POST /v1/store-sheet records the tap (sent_to 'store_sheet').
 ///  2. Android: Google Play inline install, then market://, then the Play web
-///     page, each with referrer=strait_link=<id>&strait_click=<tap>.
+///     page, each with `referrer=strait_link=<id>&strait_click=<tap>`.
 ///     iPhone: save this device's match fields for the tap (/v1/match-save),
 ///     optionally copy the paste-handoff link, then show the App Store.
 ///
