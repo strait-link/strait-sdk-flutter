@@ -362,9 +362,10 @@ class StraitLinks {
         rawUrl: raw, matched: false, reason: 'invalid_url', ms: _now() - t0, at: t0,
       ));
     }
-    if (c.needsResolve && !on) {
-      // Opted out: ask only where the link goes (/v1/lookup records nothing). Key + host + path, no query;
-      // no open report, no tap kept, no retry. An engine without it (404) or no network: 'disabled'.
+    // Where a short link goes, recorded nowhere (/v1/lookup): key + host + path, no query; no open
+    // report, no tap kept, no retry. Used while opted out, and on the web (F2: /v1/resolve without an
+    // openId counts a tap). No answer (offline, or a 404 from an engine without it): [fallback].
+    Future<LinkEvent> lookupOnly(String fallback) async {
       Map<String, dynamic> json = const {};
       try {
         final r = await _call('POST', '/v1/lookup', {'publishableKey': publishableKey, 'url': reportUrl(raw).split('?').first}, true);
@@ -374,17 +375,18 @@ class StraitLinks {
       final dest = _destination(matched ? _str(json['longUrl']) : null);
       return _emit(LinkEvent(
         id: id, kind: LinkKind.direct, route: LinkRoute.appLink, appState: state,
-        rawUrl: raw, matched: matched, reason: matched ? null : (_str(json['reason']) ?? 'disabled'),
+        rawUrl: raw, matched: matched, reason: matched ? null : (_str(json['reason']) ?? fallback),
         url: dest.url, path: dest.path, params: dest.params,
         linkId: _str(json['linkId']), ms: _now() - t0, at: t0,
       ));
     }
+    if (c.needsResolve && !on) return lookupOnly('disabled');
+    // Web: a lookup only; a web open is counted only for a landing that carries a tap id (below).
+    if (c.needsResolve && _onWeb) return lookupOnly('network');
     if (c.needsResolve) {
       // The lookup is also the open report (openId); the engine says whether
       // it recorded it, and anything short of that is retried via /v1/open.
       // B18: only host + path (+ utm_source) leave the device or reach storage.
-      // Web: a lookup only (no openId, so the engine records nothing); a web
-      // open is counted only for a landing that carries a tap id (below).
       final sent = reportUrl(raw);
       final base = <String, dynamic>{
         'openId': id, 'kind': 'direct', 'route': 'app_link', 'appState': state.name,
@@ -395,7 +397,7 @@ class StraitLinks {
           'publishableKey': publishableKey,
           'url': sent,
           'platform': platform,
-          if (!_onWeb) 'openId': id,
+          'openId': id,
           'appState': state.name,
           'firstLaunch': firstLaunch,
           'at': t0,
@@ -404,8 +406,8 @@ class StraitLinks {
         final matched = r.json['matched'] == true;
         final reason = matched ? null : (_str(r.json['reason']) ?? _str(r.json['error']));
         final linkId = _str(r.json['linkId']);
-        if (matched && !_onWeb) _noteTap(replyClickId(r.json['clickId']), t0);
-        if (!_onWeb && r.json['recorded'] != true) {
+        if (matched) _noteTap(replyClickId(r.json['clickId']), t0);
+        if (r.json['recorded'] != true) {
           unawaited(_report({
             ...base,
             'matched': matched,
@@ -421,7 +423,9 @@ class StraitLinks {
           linkId: linkId, ms: _now() - t0, at: t0,
         ));
       } catch (_) {
-        if (!_onWeb) unawaited(_enqueue({...base, 'reason': 'network'}));
+        // Switched off while the resolve was out (F4): route the way an opted-out tap does.
+        if (!await isEnabled()) return lookupOnly('disabled');
+        unawaited(_enqueue({...base, 'reason': 'network'}));
         return _emit(LinkEvent(
           id: id, kind: LinkKind.direct, route: LinkRoute.appLink, appState: state,
           rawUrl: raw, matched: false, reason: 'network', ms: _now() - t0, at: t0,
@@ -653,7 +657,10 @@ class StraitLinks {
 
   void _noteTap(String? clickId, int at) {
     final value = clickId != null ? rememberTap(clickId, at) : '';
-    _tapWrite = _tapWrite.then((_) => _storage.set(_tapKey, value)).catchError((_) {});
+    // Checked inside the chain: a reply that lands after setEnabled(false) keeps no tap.
+    _tapWrite = _tapWrite.then((_) async {
+      if (await isEnabled()) await _storage.set(_tapKey, value);
+    }).catchError((_) {});
   }
 
   /// B18: delete an expired remembered tap instead of only ignoring it.

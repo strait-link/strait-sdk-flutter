@@ -248,7 +248,7 @@ String? pageLinkLongLink(SplitUrl p) {
 }
 
 /// What a URL handed to the app means (B3, B4, B22):
-/// - https on a Strait link host → a short link; ask /v1/resolve. Except an
+/// - https on a Strait link host → a short link; ask /v1/resolve (web: /v1/lookup). Except an
 ///   FDL long link on a `*.page.link` link host (B22): its `link=` value IS the
 ///   destination, read on the device with no network call.
 /// - other https → it IS the destination.

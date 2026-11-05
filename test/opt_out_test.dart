@@ -118,6 +118,55 @@ void main() {
       }
     });
 
+    // F4: the switch goes off while /v1/resolve is out. (On the web a short link always uses /v1/lookup.)
+    test('switched off while /v1/resolve is out and it fails: routes via /v1/lookup, not network, nothing queued',
+        testOn: 'vm', () async {
+      final s = MemoryStore();
+      late StraitLinks links;
+      final calls = <String>[];
+      links = StraitLinks(
+          publishableKey: 'st_pub_test_x', endpoint: 'https://acme.strait.link', platform: 'android',
+          deviceFields: () => device, storage: s, now: () => 1800000000000,
+          client: MockClient((req) async {
+            calls.add(req.url.path);
+            if (req.url.path == '/v1/resolve') {
+              await links.setEnabled(false);
+              throw http.ClientException('offline');
+            }
+            return http.Response(jsonEncode({'matched': true, 'longUrl': 'https://shop.example/p/42', 'linkId': 'lnk_42'}), 200);
+          }));
+      final l = await links.handleUrl('https://acme.strait.link/sale');
+      await settle();
+      expect(calls, ['/v1/resolve', '/v1/lookup']);
+      expect(l.matched, isTrue);
+      expect(l.reason, isNull);
+      expect(l.path, '/p/42');
+      expect(await links.pendingOpenReports(), 0);
+      expect(s.data['strait.lastTap'] ?? '', '');
+    });
+
+    test('switched off while /v1/resolve is out and it answers: the link routes, no tap kept, nothing queued',
+        testOn: 'vm', () async {
+      final s = MemoryStore();
+      late StraitLinks links;
+      final calls = <String>[];
+      links = StraitLinks(
+          publishableKey: 'st_pub_test_x', endpoint: 'https://acme.strait.link', platform: 'android',
+          deviceFields: () => device, storage: s, now: () => 1800000000000,
+          client: MockClient((req) async {
+            calls.add(req.url.path);
+            if (req.url.path == '/v1/resolve') await links.setEnabled(false);
+            return http.Response(
+                jsonEncode({'matched': true, 'longUrl': 'https://shop.example/p/42', 'linkId': 'lnk_42', 'clickId': '3f2a9c1e-7b4d-4e8a-9f10-2c3d4e5f6a7b'}), 200);
+          }));
+      final l = await links.handleUrl('https://acme.strait.link/sale');
+      await settle();
+      expect(l.matched, isTrue);
+      expect(calls, ['/v1/resolve']);
+      expect(await links.pendingOpenReports(), 0);
+      expect(s.data['strait.lastTap'] ?? '', '');
+    });
+
     test('persists across launches', () async {
       final s = MemoryStore();
       await make(Engine(), s).setEnabled(false);

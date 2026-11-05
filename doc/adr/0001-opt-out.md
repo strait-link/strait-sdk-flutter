@@ -48,3 +48,17 @@ query string, not even utm_source): no openId, platform, device class or app sta
 with the destination and no `clickId`; nothing is queued, remembered or retried. A failed lookup (offline,
 429, or an engine without it: 404, so it fails closed) comes back `reason: 'disabled'` as before. This is
 the one engine call allowed while off; it bypasses the opt-out gate by name, nothing else does.
+
+## Update 5 Nov 2026: follow-ups F2 + F4 (`ops/run-1105/sdk-privacy-followups.md`)
+- **F2, web.** A short link handed to `handleUrl` on the web called `/v1/resolve` without an openId so as
+  "to record nothing", but the engine treats a resolve without an openId as an older SDK and records a tap
+  (and fires `link.clicked`). The web now asks `/v1/lookup` (same body as the opted-out path), which is what
+  the comment promised. Options weighed: send an openId (the engine would then record an app open: a web
+  page is not an app open), or keep `/v1/resolve` and fix the comment (a short link handed in by page script
+  is not a tap: the browser already recorded the real tap when it followed the link). No answer is
+  `reason: 'network'` (the SDK is on).
+- **F4, switch-off mid-call.** `setEnabled(false)` while `/v1/resolve` is out made that call fail at the
+  gate and the link came back `reason: 'network'` with an open report queued for later (dropped by the
+  queue's own gate). Now a failed resolve re-reads the switch and, when off, routes through `/v1/lookup`.
+  A resolve reply that lands after the switch went off still routes (the engine already has it; that request
+  left while on), but its tap id is no longer remembered.

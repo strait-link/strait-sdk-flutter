@@ -82,7 +82,8 @@ void main() {
     expect(storage.data['strait.pendingOpens'], isNot(contains('deviceClass')));
   });
 
-  test('none, invalid or throwing: left out, the link still resolves', () async {
+  // Native only: the web asks /v1/lookup (web_test.dart).
+  test('none, invalid or throwing: left out, the link still resolves', testOn: 'vm', () async {
     for (final dc in <String? Function()?>[null, () => null, () => 'watch', () => throw StateError('x')]) {
       final e = Engine({'/v1/resolve': resolved});
       final s = links(e, dc);

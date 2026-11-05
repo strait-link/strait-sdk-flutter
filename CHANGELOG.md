@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Fix (Flutter web): a short link handed to `handleUrl` on the web now asks `/v1/lookup` (key + host + path),
+  which records nothing. It used to call `/v1/resolve` without an openId, which the engine counts as a tap
+  (and fires `link.clicked`), although the SDK said it recorded nothing. A lookup with no answer is
+  `reason: 'network'`.
+- Fix: switching the SDK off while a short link's `/v1/resolve` is still out no longer answers
+  `reason: 'network'`; the link routes through `/v1/lookup` as an opted-out tap does, and nothing is queued.
+  A reply that lands after the switch went off keeps no tap.
 - New: `setEnabled(false)`, an opt-out switch for consent flows (DPDP, GDPR). While off the SDK sends
   no open reports or events and does no deferred or clipboard matching; reports saved on the device and
   the remembered tap are deleted. Kept across launches (`strait.enabled` in `storage`); `setEnabled(true)`
