@@ -81,14 +81,25 @@ void main() {
       await links.flushOpenReports();
       await settle();
       expect(e.calls, ['/v1/lookup']);
-      // Only the key and host + path (+ utm_source) leave the device: no openId, platform, device or app state.
-      expect(e.bodies.single, {'publishableKey': 'st_pub_test_x', 'url': 'https://acme.strait.link/sale?utm_source=sms'});
+      // Only the key and host + path leave the device: no query, openId, platform, device or app state.
+      expect(e.bodies.single, {'publishableKey': 'st_pub_test_x', 'url': 'https://acme.strait.link/sale'});
       final l = links.events.single;
       expect(l.matched, isTrue);
       expect(l.path, '/p/42');
       expect(l.params, {'color': 'red'});
       expect(await links.pendingOpenReports(), 0);
       expect(s.data['strait.lastTap'] ?? '', ''); // no tap remembered
+    });
+
+    test('disabled: a lookup miss keeps the engine reason, nothing queued', () async {
+      final links = make(Engine((_) => http.Response(jsonEncode({'matched': false, 'reason': 'expired'}), 200)), MemoryStore());
+      await links.setEnabled(false);
+      final urls = StreamController<String>(sync: true);
+      await links.start(urls: urls.stream);
+      urls.add('https://acme.strait.link/old');
+      await settle();
+      expect(links.events.any((l) => !l.matched && l.reason == 'expired'), isTrue);
+      expect(await links.pendingOpenReports(), 0);
     });
 
     test('disabled: an engine without /v1/lookup (404) or no network: reason disabled, nothing queued', () async {

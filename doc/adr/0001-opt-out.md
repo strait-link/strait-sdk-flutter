@@ -41,9 +41,10 @@ links route while opted out.
 
 ## Update 5 Nov 2026: short links route while off (follow-up E3)
 The engine now has `POST /v1/lookup` (engine ADR 0083): the same workspace-scoped lookup as `/v1/resolve`,
-recording nothing (no tap, no open, no counter, no webhook, no tap id; no IP or user agent kept). While off,
-a Strait short link is looked up there with the publishable key and the link's host + path (+ utm_source,
-the B18 rule) only: no openId, platform, device class or app state. The link callback gets `matched: true`
+recording nothing (no tap, no open, no counter, no webhook, no tap id; Strait's code writes no IP or user
+agent, while Cloudflare and Render keep their usual short-lived request logs, as for every request). While
+off, a Strait short link is looked up there with the publishable key and the link's host + path only (no
+query string, not even utm_source): no openId, platform, device class or app state. The link callback gets `matched: true`
 with the destination and no `clickId`; nothing is queued, remembered or retried. A failed lookup (offline,
 429, or an engine without it: 404, so it fails closed) comes back `reason: 'disabled'` as before. This is
 the one engine call allowed while off; it bypasses the opt-out gate by name, nothing else does.

@@ -363,11 +363,11 @@ class StraitLinks {
       ));
     }
     if (c.needsResolve && !on) {
-      // Opted out: ask only where the link goes (/v1/lookup records nothing). Key + host + path only;
+      // Opted out: ask only where the link goes (/v1/lookup records nothing). Key + host + path, no query;
       // no open report, no tap kept, no retry. An engine without it (404) or no network: 'disabled'.
       Map<String, dynamic> json = const {};
       try {
-        final r = await _call('POST', '/v1/lookup', {'publishableKey': publishableKey, 'url': reportUrl(raw)}, true);
+        final r = await _call('POST', '/v1/lookup', {'publishableKey': publishableKey, 'url': reportUrl(raw).split('?').first}, true);
         if (r.ok) json = r.json;
       } catch (_) {}
       final matched = json['matched'] == true;
