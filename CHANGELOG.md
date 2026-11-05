@@ -9,7 +9,9 @@
   leave it out and only the SDK version (`straitSdkVersion`) is sent. Trimmed and capped at 64 characters;
   anything not plain ASCII is left out. Never sent with `/v1/event` or `/v1/lookup`, and nothing is sent
   while `setEnabled(false)` is set. The legacy `resolveDeferredLink` takes `appVersion` too. ADR 0002.
-
+- Fix (privacy, F7): switching the SDK off during the first-launch check no longer reads the iPhone clipboard
+  (paste handoff, which shows iOS's paste prompt). The switch is checked before the prompt-free "is there a link?"
+  check and again before the read; nothing is claimed.
 - Fix (privacy): the legacy `resolveDeferredLink` ignored the opt-out switch and still called `/v1/match`
   (one install row per call). It now takes `storage` (pass the one you give `StraitLinks`); while
   `setEnabled(false)` is set there it sends nothing and returns `MatchResult.none`. **Action required** if

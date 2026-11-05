@@ -565,11 +565,12 @@ class StraitLinks {
     // = the choice is unknown: the clipboard stays untouched and the check
     // runs again next launch. Same openId across both attempts, one event.
     // Once a link is here the result won't be delivered: don't read the
-    // clipboard (that shows iOS's paste prompt for nothing).
-    if (result.matched || quiet() || !(record && pasteOn && platform == 'ios' && _clipboard != null)) {
+    // clipboard (that shows iOS's paste prompt for nothing). Nor once the app
+    // switched Strait off during the check (F7): no paste prompt for an opted-out person.
+    if (result.matched || quiet() || !(record && pasteOn && platform == 'ios' && _clipboard != null) || !await isEnabled()) {
       return done(result);
     }
-    final token = await _handoffToken(quiet);
+    final token = await _handoffToken(() => quiet() || _enabled == false);
     if (token == null) return done(result);
     try {
       final c = await answered('/v1/handoff/claim', {
