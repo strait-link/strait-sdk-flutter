@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.10.0 (unreleased, launch week)
+## 0.10.0 (5 Nov 2026)
 
 - Fix: reinstalls from a link are no longer lost. Android Auto Backup and restored iPhones put back
   the "deferred check done" flag, so a reinstall skipped its deferred link and was never counted.
