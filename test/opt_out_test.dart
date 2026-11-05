@@ -167,6 +167,31 @@ void main() {
       expect(s.data['strait.lastTap'] ?? '', '');
     });
 
+    // F5: the legacy one-call API honours the same switch, read from the storage the app passes.
+    for (final platform in ['android', 'ios']) {
+      test('legacy resolveDeferredLink ($platform), switched off through StraitLinks (same storage): no call, no match',
+          () async {
+        final s = MemoryStore();
+        await make(Engine(), s).setEnabled(false);
+        final e = Engine((_) => http.Response(jsonEncode({'matched': true, 'linkId': 'lnk_42', 'matchMethod': 'install_referrer'}), 200));
+        final r = await resolveDeferredLink(
+            publishableKey: 'st_pub_test_x', endpoint: 'https://acme.strait.link', platform: platform,
+            device: device, installReferrer: 'strait_link=lnk_42', client: e.client, storage: s);
+        expect(r.matched, isFalse);
+        expect(e.calls, isEmpty);
+      });
+    }
+
+    test('legacy resolveDeferredLink, on or no storage given: asks the engine as before', () async {
+      for (final storage in [MemoryStore(), null]) {
+        final e = Engine((_) => http.Response(jsonEncode({'matched': false, 'matchMethod': 'none'}), 200));
+        await resolveDeferredLink(
+            publishableKey: 'st_pub_test_x', endpoint: 'https://acme.strait.link', platform: 'ios',
+            device: device, client: e.client, storage: storage);
+        expect(e.calls, ['/v1/match']);
+      }
+    });
+
     test('persists across launches', () async {
       final s = MemoryStore();
       await make(Engine(), s).setEnabled(false);
