@@ -303,8 +303,8 @@ class StraitLinks {
   /// launches). Off: no open reports, no events, no deferred or clipboard
   /// matching, nothing remembered; reports saved earlier and the remembered
   /// tap are deleted. A link that carries its own destination still reaches
-  /// [onLink]; a short link needs a lookup that counts the tap, so it comes
-  /// back `reason: 'disabled'`. Back on: sending resumes, and a first-launch
+  /// [onLink]; a short link is looked up through /v1/lookup, which records nothing (no tap, no open,
+  /// no tap id), so it still routes (`reason: 'disabled'` only if that lookup fails). Back on: sending resumes, and a first-launch
   /// check skipped while off runs now. Never throws.
   Future<void> setEnabled(bool enabled) async {
     _enabled = enabled;
@@ -363,10 +363,20 @@ class StraitLinks {
       ));
     }
     if (c.needsResolve && !on) {
-      // Opted out: the lookup would count the tap, so a short link can't be resolved.
+      // Opted out: ask only where the link goes (/v1/lookup records nothing). Key + host + path, no query;
+      // no open report, no tap kept, no retry. An engine without it (404) or no network: 'disabled'.
+      Map<String, dynamic> json = const {};
+      try {
+        final r = await _call('POST', '/v1/lookup', {'publishableKey': publishableKey, 'url': reportUrl(raw).split('?').first}, true);
+        if (r.ok) json = r.json;
+      } catch (_) {}
+      final matched = json['matched'] == true;
+      final dest = _destination(matched ? _str(json['longUrl']) : null);
       return _emit(LinkEvent(
         id: id, kind: LinkKind.direct, route: LinkRoute.appLink, appState: state,
-        rawUrl: raw, matched: false, reason: 'disabled', ms: _now() - t0, at: t0,
+        rawUrl: raw, matched: matched, reason: matched ? null : (_str(json['reason']) ?? 'disabled'),
+        url: dest.url, path: dest.path, params: dest.params,
+        linkId: _str(json['linkId']), ms: _now() - t0, at: t0,
       ));
     }
     if (c.needsResolve) {
@@ -877,9 +887,10 @@ class StraitLinks {
     }
   }
 
-  // Every engine call goes through here: while opted out nothing leaves the device.
-  Future<_Res> _call(String method, String path, [Map<String, dynamic>? body]) async {
-    if (!await isEnabled()) throw StateError('disabled');
+  /// Every engine call goes through here: while opted out nothing leaves the device, except
+  /// [lookupOnly] (/v1/lookup: where a short link goes, recorded nowhere, engine ADR 0083).
+  Future<_Res> _call(String method, String path, [Map<String, dynamic>? body, bool lookupOnly = false]) async {
+    if (!lookupOnly && !await isEnabled()) throw StateError('disabled');
     final uri = Uri.parse('$_base$path');
     // A stalled reply must not hang start() or the open queue: like the Android
     // SDK's 10 s timeouts, it throws into the existing 'network' path.
