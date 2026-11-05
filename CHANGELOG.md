@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- New: `setEnabled(false)`, an opt-out switch for consent flows (DPDP, GDPR). While off the SDK sends
+  no open reports or events and does no deferred or clipboard matching; reports saved on the device and
+  the remembered tap are deleted. Kept across launches (`strait.enabled` in `storage`); `setEnabled(true)`
+  resumes and runs a first-launch check that was skipped while off. `isEnabled()` reads it. Default on.
+  Links that carry their own destination still reach `onLink`; short links come back `reason: 'disabled'`
+  (resolving one counts the tap). Flutter web follows the same rules. ADR 0001 (doc/adr).
+
 ## 0.9.7
 
 - Flutter web: web opens are counted only for landings from a Strait tap. A page URL that carries
