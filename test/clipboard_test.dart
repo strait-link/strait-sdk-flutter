@@ -465,4 +465,38 @@ void main() {
       expect((await make(e).claimHandoff(handoff)).reason, 'network');
     });
   });
+
+  // F7: switched off during the first-launch check: no clipboard read (iOS shows a paste prompt).
+  group('switched off mid-check (opt-out)', () {
+    test('while /v1/match is out: the clipboard is not touched, nothing is claimed', () async {
+      final gate = Completer<void>();
+      final clip = SpyClipboard();
+      final e = Engine({'/v1/match': noMatch, '/v1/handoff/claim': claimed}, holds: {'/v1/match': gate.future});
+      final s = make(e, clip: clip);
+      final started = s.start();
+      await Future<void>.delayed(Duration.zero);
+      await s.setEnabled(false);
+      gate.complete();
+      await started;
+      expect(clip.detects + clip.reads, 0);
+      expect(e.paths, ['/v1/match']);
+    });
+
+    test('between the detect (no prompt) and the read: no read, nothing is claimed', () async {
+      final gate = Completer<void>();
+      final clip = SpyClipboard()..detectGate = gate.future;
+      final e = Engine({'/v1/match': noMatch, '/v1/handoff/claim': claimed});
+      final s = make(e, clip: clip);
+      final started = s.start();
+      while (clip.detects == 0) {
+        await Future<void>.delayed(Duration.zero);
+      }
+      await s.setEnabled(false);
+      gate.complete();
+      await started;
+      expect(clip.detects, 1);
+      expect(clip.reads, 0);
+      expect(e.paths, ['/v1/match']);
+    });
+  });
 }
