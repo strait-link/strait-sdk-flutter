@@ -138,6 +138,10 @@ const _queueKey = 'strait.pendingOpens';
 const _tapKey = 'strait.lastTap';
 const _enabledKey = 'strait.enabled';
 
+/// The engine calls that record an app open or install: they carry `appVersion` + `sdkVersion`
+/// (td2-23). Not /v1/lookup (records nothing) and not /v1/event.
+const _recordingPaths = {'/v1/open', '/v1/resolve', '/v1/referrer', '/v1/match', '/v1/handoff/claim'};
+
 /// True in a web build (dart2js and dart2wasm), the same test as Flutter's `kIsWeb`.
 const bool _onWeb = bool.fromEnvironment('dart.library.js_interop');
 
@@ -170,6 +174,7 @@ class StraitLinks {
   final bool clipboardBoost;
   final StraitClipboard? _clipboard;
   final String? Function()? _deviceClass;
+  final String? _appVersion;
   bool _firstLaunch = false;
   /// A direct link arrived in this launch (B6: the first-launch check then stays quiet).
   bool _directArrived = false;
@@ -200,8 +205,10 @@ class StraitLinks {
     this.clipboardBoost = false,
     StraitClipboard? clipboard,
     String? Function()? deviceClass,
+    String? appVersion,
   })  : _clipboard = clipboard,
         _deviceClass = deviceClass,
+        _appVersion = appVersion,
         _base = trimTrailingSlashes(endpoint),
         _linkHosts = normalizeLinkHosts(trimTrailingSlashes(endpoint), linkHosts),
         _storage = storage ?? MemoryStore(),
@@ -899,6 +906,10 @@ class StraitLinks {
   Future<_Res> _call(String method, String path, [Map<String, dynamic>? body, bool lookupOnly = false]) async {
     if (!lookupOnly && !await isEnabled()) throw StateError('disabled');
     final uri = Uri.parse('$_base$path');
+    // td2-23: versions are added at send time (never saved in the open queue), so retries carry them too.
+    if (body != null && _recordingPaths.contains(path)) {
+      body = {...body, ...versionFields(_appVersion)};
+    }
     // A stalled reply must not hang start() or the open queue: like the Android
     // SDK's 10 s timeouts, it throws into the existing 'network' path.
     final res = await (body == null
