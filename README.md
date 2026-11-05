@@ -98,7 +98,8 @@ the app state, runs the deferred check once per install, and emits one
 `LinkEvent` for every case. Typical wiring with
 [`app_links`](https://pub.dev/packages/app_links),
 [`shared_preferences`](https://pub.dev/packages/shared_preferences),
-[`play_install_referrer`](https://pub.dev/packages/play_install_referrer) and
+[`play_install_referrer`](https://pub.dev/packages/play_install_referrer),
+[`package_info_plus`](https://pub.dev/packages/package_info_plus) and
 [`flutter_timezone`](https://pub.dev/packages/flutter_timezone):
 
 ```dart
@@ -110,6 +111,7 @@ import 'package:strait_sdk/strait_sdk.dart';
 import 'package:flutter/foundation.dart'; // kIsWeb, defaultTargetPlatform (dart:io's Platform throws on the web)
 import 'package:flutter/widgets.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:play_install_referrer/play_install_referrer.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -168,6 +170,9 @@ Future<StraitLinks> startStrait() async {
       final view = PlatformDispatcher.instance.views.first;
       return deviceClassForSize(view.physicalSize.shortestSide / view.devicePixelRatio);
     },
+    // Your app's version, sent with each open and install report (with the SDK's own
+    // version) so support can answer "which app version?". Leave it out to send none.
+    appVersion: (await PackageInfo.fromPlatform()).version,
   );
 
   // Subscribe before start() so nothing is missed (past events replay anyway).

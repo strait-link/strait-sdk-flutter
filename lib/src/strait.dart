@@ -67,6 +67,7 @@ class MatchResult {
 /// [storage]: the one you give [StraitLinks], so its opt-out switch (`setEnabled(false)`, kept as
 /// `strait.enabled`) is honoured here too: while off this sends nothing (no install) and returns
 /// [MatchResult.none]. Left out, the switch can't be read and the check runs.
+/// [appVersion]: your app's version (as for [StraitLinks]); sent with `sdkVersion` (td2-23).
 Future<MatchResult> resolveDeferredLink({
   required String publishableKey,
   required String endpoint,
@@ -75,6 +76,7 @@ Future<MatchResult> resolveDeferredLink({
   String? installReferrer,
   http.Client? client,
   KeyValueStore? storage,
+  String? appVersion,
 }) async {
   // Opted out (ADR 0001): no referrer or match call. Unreadable storage = on, as in StraitLinks.
   String? enabled;
@@ -108,6 +110,7 @@ Future<MatchResult> resolveDeferredLink({
           'publishableKey': publishableKey,
           'linkId': linkId,
           'platform': platform,
+          ...versionFields(appVersion),
         });
         if (r.matched) return r;
       }
@@ -116,6 +119,7 @@ Future<MatchResult> resolveDeferredLink({
       'publishableKey': publishableKey,
       'platform': platform,
       ...device.toJson(),
+      ...versionFields(appVersion),
     });
   } finally {
     if (ownsClient) c.close();

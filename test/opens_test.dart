@@ -164,6 +164,7 @@ void main() {
         'matched': true,
         'firstLaunch': false,
         'at': e.at,
+        'sdkVersion': straitSdkVersion,
       });
     });
 
@@ -429,6 +430,7 @@ void main() {
         'platform': 'android',
         'openId': h.events[0].id,
         'at': h.events[0].at,
+        'sdkVersion': straitSdkVersion,
       });
       expect(h.events[0].kind, LinkKind.deferred);
       expect(h.events[0].route, LinkRoute.installReferrer);
@@ -445,6 +447,7 @@ void main() {
         ...device.toJson(),
         'openId': h.events[0].id,
         'at': h.events[0].at,
+        'sdkVersion': straitSdkVersion,
       });
     });
 
