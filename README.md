@@ -309,7 +309,7 @@ company's app can't open a store sheet there.
 ## User consent / opt-out
 
 If your app asks for consent first (for example under India's DPDP Act or a GDPR consent flow in the EU), call `await links.setEnabled(false)` until the person agrees: Strait then sends no open reports or events, does no install matching, and deletes reports waiting on the device. The choice is kept across launches in your `storage`; `setEnabled(true)` turns it back on (default: on) and `isEnabled()` reads it.
-Links that carry their own destination still reach `onLink`; a short link needs a lookup that counts the tap, so it comes back `matched: false, reason: 'disabled'`. Whether you need consent, and for what, is a question for your own legal advice.
+Links that carry their own destination still reach `onLink`. A Strait short link is looked up through the engine's `/v1/lookup`, which records nothing (no tap, no open, no tap id), so it still opens the right screen; only if that lookup fails (offline) does it come back `matched: false, reason: 'disabled'`. Whether you need consent, and for what, is a question for your own legal advice.
 
 ## Check your setup (doctor)
 
