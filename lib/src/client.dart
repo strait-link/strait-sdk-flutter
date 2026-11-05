@@ -138,9 +138,10 @@ const _queueKey = 'strait.pendingOpens';
 const _tapKey = 'strait.lastTap';
 const _enabledKey = 'strait.enabled';
 
-/// The engine calls that record an app open or install: they carry `appVersion` + `sdkVersion`
-/// (td2-23). Not /v1/lookup (records nothing) and not /v1/event.
-const _recordingPaths = {'/v1/open', '/v1/resolve', '/v1/referrer', '/v1/match', '/v1/handoff/claim'};
+/// The engine calls that record an app open or install get `appVersion` + `sdkVersion` (td2-23) at send
+/// time. Not /v1/open: an open report is stamped when it is made, so one saved offline and sent after an
+/// app update still names the build it happened on. Not /v1/lookup (records nothing) or /v1/event.
+const _recordingPaths = {'/v1/resolve', '/v1/referrer', '/v1/match', '/v1/handoff/claim'};
 
 /// True in a web build (dart2js and dart2wasm), the same test as Flutter's `kIsWeb`.
 const bool _onWeb = bool.fromEnvironment('dart.library.js_interop');
@@ -398,6 +399,7 @@ class StraitLinks {
       final base = <String, dynamic>{
         'openId': id, 'kind': 'direct', 'route': 'app_link', 'appState': state.name,
         'platform': platform, 'url': sent, 'matched': false, 'firstLaunch': firstLaunch, 'at': t0,
+        ...versionFields(_appVersion),
       };
       try {
         final r = await _call('POST', '/v1/resolve', {
@@ -452,6 +454,7 @@ class StraitLinks {
         'url': c.url == null ? null : reportUrl(c.url!),
         if (c.clickId != null) 'clickId': c.clickId,
         'matched': true, 'firstLaunch': firstLaunch, 'at': t0,
+        ...versionFields(_appVersion),
       }));
     }
     return _emit(LinkEvent(
@@ -907,7 +910,7 @@ class StraitLinks {
   Future<_Res> _call(String method, String path, [Map<String, dynamic>? body, bool lookupOnly = false]) async {
     if (!lookupOnly && !await isEnabled()) throw StateError('disabled');
     final uri = Uri.parse('$_base$path');
-    // td2-23: versions are added at send time (never saved in the open queue), so retries carry them too.
+    // td2-23 (open reports carry their own, stamped when made).
     if (body != null && _recordingPaths.contains(path)) {
       body = {...body, ...versionFields(_appVersion)};
     }

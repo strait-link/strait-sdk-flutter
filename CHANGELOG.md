@@ -3,8 +3,9 @@
 ## Unreleased
 
 - New: every app open and install the SDK reports (`/v1/open`, `/v1/resolve`, `/v1/referrer`, `/v1/match`,
-  `/v1/handoff/claim`, offline retries included) now says which version of your app and of this SDK sent it,
-  so "links stopped working" can be traced to a release. Pass `appVersion:` to `StraitLinks` (for example
+  `/v1/handoff/claim`) now says which version of your app and of this SDK sent it, so "links stopped working"
+  can be traced to a release. An open saved offline keeps the versions it happened on, even if it is sent
+  after an update. Pass `appVersion:` to `StraitLinks` (for example
   `PackageInfo.fromPlatform()` from `package_info_plus`; the SDK stays pure Dart and adds no dependency);
   leave it out and only the SDK version (`straitSdkVersion`) is sent. Trimmed and capped at 64 characters;
   anything not plain ASCII is left out. Never sent with `/v1/event` or `/v1/lookup`, and nothing is sent

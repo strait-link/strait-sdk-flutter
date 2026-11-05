@@ -29,8 +29,10 @@ Options:
 version bump that forgets it fails CI.
 
 ## Design
-Added in the one HTTP helper for the recording paths, at send time: queued open reports are saved without
-them (nothing new stored on the device) and retries carry them. The helper already refuses every call while
+An open report is stamped when it is made, and the stamp is saved with it in the offline queue: an open saved
+offline and sent after an app or SDK update still names the build it happened on (the answer support needs).
+Reports saved by an older SDK have no stamp and are sent as they are. The other recording calls are never
+queued, so the one HTTP helper adds the fields at send time. That helper already refuses every call while
 opted out, so neither field leaves the device then. The SDK applies the engine rule too (trim, cap 64, ASCII
 only, else omit) so a bad value is never sent.
 

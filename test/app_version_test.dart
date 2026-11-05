@@ -84,17 +84,31 @@ void main() {
       expect(e.of('/v1/open').single, carriesVersions());
     });
 
-    test('an open saved offline is sent later with both fields, and saved without them', () async {
+    test('an open saved offline keeps the versions it was made with (sent after an app update)', () async {
       final e = Engine()..offline = true;
       final s = MemoryStore()..data['strait.deferredChecked'] = '1';
-      final links = make(e, storage: s);
-      await links.handleUrl('acme://product/42');
+      await make(e, storage: s, appVersion: '4.12.0 (812)').handleUrl('acme://product/42');
       await settle();
-      expect(await links.pendingOpenReports(), 1);
-      expect(s.data['strait.pendingOpens'], allOf(isNot(contains('appVersion')), isNot(contains('sdkVersion'))));
+      // Next launch, after the app updated: the saved open still says the build it happened on.
       e.offline = false;
-      await links.flushOpenReports();
+      final updated = make(e, storage: s, appVersion: '4.13.0 (820)');
+      expect(await updated.pendingOpenReports(), 1);
+      await updated.flushOpenReports();
       expect(e.of('/v1/open').single, carriesVersions());
+    });
+
+    test('opens saved by an older SDK are sent as they were saved', () async {
+      final e = Engine();
+      final s = MemoryStore()
+        ..data['strait.deferredChecked'] = '1'
+        ..data['strait.pendingOpens'] = jsonEncode([
+          {'openId': 'o_1', 'kind': 'direct', 'route': 'app_link', 'appState': 'closed', 'platform': 'android', 'matched': true, 'firstLaunch': false, 'at': 1800000000000},
+          {'openId': 'o_2', 'kind': 'direct', 'route': 'app_link', 'appState': 'closed', 'platform': 'android', 'matched': true, 'firstLaunch': false, 'at': 1800000000000, 'appVersion': '4.11.0', 'sdkVersion': '0.9.6'},
+        ]);
+      await make(e, storage: s).flushOpenReports();
+      final sent = e.of('/v1/open');
+      expect(sent[0], noVersions());
+      expect(sent[1], allOf(containsPair('appVersion', '4.11.0'), containsPair('sdkVersion', '0.9.6')));
     });
 
     test('/v1/referrer and /v1/match on the first-launch check', () async {
