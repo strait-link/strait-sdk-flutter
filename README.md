@@ -99,8 +99,8 @@ the app state, runs the deferred check once per install, and emits one
 [`app_links`](https://pub.dev/packages/app_links),
 [`shared_preferences`](https://pub.dev/packages/shared_preferences),
 [`play_install_referrer`](https://pub.dev/packages/play_install_referrer),
-[`flutter_timezone`](https://pub.dev/packages/flutter_timezone) and
-[`package_info_plus`](https://pub.dev/packages/package_info_plus):
+[`package_info_plus`](https://pub.dev/packages/package_info_plus) and
+[`flutter_timezone`](https://pub.dev/packages/flutter_timezone):
 
 ```dart
 import 'dart:async';
