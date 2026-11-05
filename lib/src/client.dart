@@ -136,6 +136,7 @@ class LinkStart {
 const _deferredFlag = 'strait.deferredChecked';
 const _queueKey = 'strait.pendingOpens';
 const _tapKey = 'strait.lastTap';
+const _enabledKey = 'strait.enabled';
 
 /// True in a web build (dart2js and dart2wasm), the same test as Flutter's `kIsWeb`.
 const bool _onWeb = bool.fromEnvironment('dart.library.js_interop');
@@ -172,6 +173,12 @@ class StraitLinks {
   bool _firstLaunch = false;
   /// A direct link arrived in this launch (B6: the first-launch check then stays quiet).
   bool _directArrived = false;
+
+  /// Opt-out switch, read from storage once; unreadable storage = the default (on), like every other read here.
+  bool? _enabled;
+
+  /// The first-launch check was skipped because the SDK was off: [setEnabled] true runs it.
+  bool _deferredDue = false;
 
   final _tracker = AppStateTracker();
   final _events = <LinkEvent>[];
@@ -273,11 +280,57 @@ class StraitLinks {
       if (firstLaunch) await _setFlag();
       await _handleUrl(initialUrl, AppStateAtLink.closed, firstLaunch);
     } else if (firstLaunch) {
-      // Marked done only once the engine answered: offline → next launch.
-      final e = await _runDeferred(true);
-      if (e.reason != 'network') await _setFlag();
+      if (await isEnabled()) {
+        await _firstCheck();
+      } else {
+        _deferredDue = true; // opted out: not marked done, runs when switched back on
+      }
     }
     unawaited(flushOpenReports());
+  }
+
+  /// The once-per-install check; marked done only once the engine answered (offline → next launch).
+  Future<void> _firstCheck() async {
+    final e = await _runDeferred(true);
+    if (e.reason != 'network') await _setFlag();
+  }
+
+  /// Opt-out switch for consent flows (default on, kept in `storage` across
+  /// launches). Off: no open reports, no events, no deferred or clipboard
+  /// matching, nothing remembered; reports saved earlier and the remembered
+  /// tap are deleted. A link that carries its own destination still reaches
+  /// [onLink]; a short link needs a lookup that counts the tap, so it comes
+  /// back `reason: 'disabled'`. Back on: sending resumes, and a first-launch
+  /// check skipped while off runs now. Never throws.
+  Future<void> setEnabled(bool enabled) async {
+    _enabled = enabled;
+    try {
+      await _storage.set(_enabledKey, enabled ? '1' : '0');
+    } catch (_) {}
+    if (!enabled) {
+      // Opting out also deletes what was saved to send later.
+      await _serial(() => _writeQueue(const []));
+      _tapWrite = _tapWrite.then((_) => _storage.set(_tapKey, '')).catchError((_) {});
+      await _tapWrite;
+      return;
+    }
+    if (_deferredDue) {
+      _deferredDue = false;
+      await _firstCheck();
+    }
+    unawaited(flushOpenReports());
+  }
+
+  /// The opt-out switch's current value (see [setEnabled]).
+  Future<bool> isEnabled() async {
+    if (_enabled == null) {
+      String? v;
+      try {
+        v = await _storage.get(_enabledKey);
+      } catch (_) {}
+      _enabled ??= v != '0'; // a setEnabled() during the read wins
+    }
+    return _enabled!;
   }
 
   Future<void> _setFlag() async {
@@ -296,12 +349,20 @@ class StraitLinks {
     final t0 = _now();
     final state = appState ?? _tracker.classify(t0);
     final id = newOpenId(t0);
+    final on = await isEnabled();
     _announce(LinkStart(id: id, kind: LinkKind.direct, appState: state, rawUrl: raw, at: t0));
     final c = classifyUrl(raw, _linkHosts);
     if (c == null) {
       return _emit(LinkEvent(
         id: id, kind: LinkKind.direct, route: LinkRoute.appLink, appState: state,
         rawUrl: raw, matched: false, reason: 'invalid_url', ms: _now() - t0, at: t0,
+      ));
+    }
+    if (c.needsResolve && !on) {
+      // Opted out: the lookup would count the tap, so a short link can't be resolved.
+      return _emit(LinkEvent(
+        id: id, kind: LinkKind.direct, route: LinkRoute.appLink, appState: state,
+        rawUrl: raw, matched: false, reason: 'disabled', ms: _now() - t0, at: t0,
       ));
     }
     if (c.needsResolve) {
@@ -353,12 +414,12 @@ class StraitLinks {
         ));
       }
     }
-    if (c.clickId != null) _noteTap(c.clickId, t0);
+    if (c.clickId != null && on) _noteTap(c.clickId, t0);
     // Web: the page URL is an open only when it carries the tap id the engine
     // appends when it sends a tap to the web (`strait_click`); one open per tap
     // (openId `web-<tap>`), so a reload or a shared landing URL is de-duplicated
     // by the engine. Any other page URL is a page view: routed, never reported.
-    if (!_onWeb || c.clickId != null) {
+    if (on && (!_onWeb || c.clickId != null)) {
       // Navigation never waits for the report.
       unawaited(_report({
         'openId': _onWeb ? 'web-${c.clickId}' : id, 'kind': 'direct', 'route': c.route.value,
@@ -385,6 +446,12 @@ class StraitLinks {
   Future<LinkEvent> _runDeferred(bool record) async {
     final t0 = _now();
     final id = newOpenId(t0);
+    if (!await isEnabled()) {
+      return LinkEvent(
+        id: id, kind: LinkKind.deferred, route: LinkRoute.fingerprint,
+        appState: AppStateAtLink.closed, matched: false, reason: 'disabled', ms: 0, at: t0,
+      );
+    }
     final tag = record ? {'openId': id, 'at': t0} : const <String, Object>{'record': false};
     // B6: a link that arrived before or while this once-per-install check ran is
     // what the person wants now. The check's answer (a match, no_match or
@@ -527,10 +594,10 @@ class StraitLinks {
     final id = newOpenId(t0);
     _announce(LinkStart(id: id, kind: LinkKind.deferred, appState: AppStateAtLink.closed, at: t0));
     final token = parseHandoffUrl(text, _linkHosts);
-    if (token == null) {
+    if (token == null || !await isEnabled()) {
       return _emit(LinkEvent(
         id: id, kind: LinkKind.deferred, route: LinkRoute.clipboard,
-        appState: AppStateAtLink.closed, matched: false, reason: 'not_handoff',
+        appState: AppStateAtLink.closed, matched: false, reason: token == null ? 'not_handoff' : 'disabled',
         ms: _now() - t0, at: t0,
       ));
     }
@@ -616,6 +683,7 @@ class StraitLinks {
   }
 
   Future<void> _enqueue(Map<String, dynamic> report) => _serial(() async {
+        if (!await isEnabled()) return;
         await _writeQueue(pruneOpenQueue([...await _readQueue(), report], _now()));
       });
 
@@ -646,6 +714,7 @@ class StraitLinks {
   /// Send saved open reports now (also happens on start and on resume).
   /// Never throws.
   Future<void> flushOpenReports() => _flushing ??= _serial(() async {
+        if (!await isEnabled()) return;
         final queue = pruneOpenQueue(await _readQueue(), _now());
         final keep = <Map<String, dynamic>>[];
         var offline = false;
@@ -730,6 +799,7 @@ class StraitLinks {
   /// B15) unless you pass [clickId] yourself.
   Future<bool> trackEvent(String name,
       {num? value, String? currency, String? linkId, String? clickId}) async {
+    if (!await isEnabled()) return false;
     try {
       await _tapWrite;
       String? stored;
@@ -803,7 +873,9 @@ class StraitLinks {
     }
   }
 
+  // Every engine call goes through here: while opted out nothing leaves the device.
   Future<_Res> _call(String method, String path, [Map<String, dynamic>? body]) async {
+    if (!await isEnabled()) throw StateError('disabled');
     final uri = Uri.parse('$_base$path');
     // A stalled reply must not hang start() or the open queue: like the Android
     // SDK's 10 s timeouts, it throws into the existing 'network' path.
