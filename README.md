@@ -258,7 +258,10 @@ Every time a link opens the app, the SDK reports it once (contract B14):
 Reports that can't be sent (offline, server busy) are saved in `storage`
 (key `strait.pendingOpens`, so pass a persistent `KeyValueStore`) and retried
 on the next `start()`, whenever the `lifecycle` stream reports `active`, and
-after any report that gets through, for up to 7 days (max 100). The engine
+after any report that gets through, for up to 7 days (max 100). When the
+server is busy (429 or 5xx) the SDK waits before sending the saved ones again:
+15–30 s, doubling each time in a row up to 1 hour, and at least as long as the
+server's `Retry-After`. The engine
 de-duplicates by open id (`LinkEvent.id`), so nothing is counted twice.
 Navigation never waits for a report. The first launch of an install is marked
 as such, so dashboards can tell **new users** (installed and opened) from
@@ -401,7 +404,7 @@ B7 (Install Referrer → `/v1/referrer` with `parseStraitClick`, else
 `Uri` parsing) · B13 (`trackEvent`, `reportFingerprint`, `compareFingerprint`) · B13a (`trackEvent` `eventId`,
 `newEventId`, events kept in the open-report queue)
 · B14 (every open reported once, `strait.pendingOpens` retry queue,
-`pendingOpenReports`, `flushOpenReports`, `deviceClass` / `deviceClassForSize`) · B15 (events carry the remembered
+`pendingOpenReports`, `flushOpenReports`, `deviceClass` / `deviceClassForSize`; C1 backoff on 429/5xx, `retryDelayMs`) · B15 (events carry the remembered
 tap id, `strait.lastTap`, `eventClickId`) · B16 (the tap id from the
 `/v1/resolve`, `/v1/match` and `/v1/referrer` replies, `replyClickId`) · B17
 (portrait screen width, `portraitScreenWidth`) · B18 (reported and queued URLs
@@ -410,7 +413,7 @@ taps are deleted, `staleTap`) · B19 (iPhone paste handoff, chosen in the dashbo
 `parseHandoffUrl`, `/v1/handoff/claim`, `claimHandoff`) · B22 (old Firebase
 page.link links: short → `/v1/resolve`, long → `link=` read on the device) · B23
 (`doctor()` setup check, `doctorFindings`). Both
-shared vector files (conformance v10) are asserted in `dart test`.
+shared vector files (conformance v11) are asserted in `dart test`.
 
 ## iPhone deferred links (opt-in): you choose the method (B19)
 

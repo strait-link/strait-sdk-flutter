@@ -4,7 +4,7 @@
 library;
 
 import 'dart:convert' show jsonDecode, jsonEncode;
-import 'dart:math' show Random;
+import 'dart:math' show Random, max, min;
 
 /// How the app received a link.
 enum LinkRoute {
@@ -377,6 +377,31 @@ String? replyReferralCode(Object? reply) =>
 
 /// Whether a failed report should be kept for retry: no answer, 429 or 5xx.
 bool shouldRetryReport(int? status) => status == null || status == 429 || status >= 500;
+
+/// C1 backoff: the first hold after a 429/5xx is 15-30 s; each one in a row doubles it, up to [retryMaxMs].
+const retryBaseMs = 30000;
+
+/// C1 backoff: never hold the queue longer than 1 hour (Retry-After included).
+const retryMaxMs = 3600000;
+
+final _retryAfterRe = RegExp(r'^[0-9]{1,9}$');
+
+/// How long to hold the open/event queue after the [failures]-th 429/5xx
+/// answer in a row (contract B14, C1). Exponential with equal jitter:
+/// step = min([retryMaxMs], [retryBaseMs] × 2^(failures−1)), wait
+/// floor(step/2 + random × step/2), so phones that failed together spread
+/// out. A [retryAfter] in whole seconds (1-9 ASCII digits, spaces trimmed; an
+/// HTTP date or anything else is ignored) is a floor. The result never
+/// exceeds [retryMaxMs]. [random] is in [0, 1] (the platform's random number).
+int retryDelayMs(int failures, String? retryAfter, double random) {
+  final n = failures.clamp(1, 17);
+  final half = min(retryMaxMs, retryBaseMs * (1 << (n - 1))) / 2;
+  final r = random.clamp(0.0, 1.0);
+  final backoff = (half + r * half).floor();
+  final s = retryAfter?.trim();
+  final server = s != null && _retryAfterRe.hasMatch(s) ? min(int.parse(s), retryMaxMs ~/ 1000) * 1000 : 0;
+  return min(retryMaxMs, max(backoff, server));
+}
 
 final _rng = Random();
 

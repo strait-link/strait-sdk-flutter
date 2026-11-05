@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' show Random;
 
 import 'package:http/http.dart' as http;
 
@@ -162,6 +163,7 @@ class StraitLinks {
   final http.Client _http;
   final bool _ownsHttp;
   final int Function() _now;
+  final double Function() _random;
 
   /// Deprecated and ignored. Whether the SDK tries the paste handoff is the
   /// customer's choice in Dashboard Settings -> iPhone installs, read live
@@ -192,6 +194,7 @@ class StraitLinks {
     Future<int?> Function()? installTime,
     http.Client? client,
     int Function()? now,
+    double Function()? random,
     @Deprecated('Ignored: the workspace setting (Dashboard Settings -> iPhone installs) decides at runtime.')
     this.clipboardBoost = false,
     StraitClipboard? clipboard,
@@ -206,7 +209,8 @@ class StraitLinks {
         _device = deviceFields,
         _http = client ?? http.Client(),
         _ownsHttp = client == null,
-        _now = now ?? (() => DateTime.now().millisecondsSinceEpoch);
+        _now = now ?? (() => DateTime.now().millisecondsSinceEpoch),
+        _random = random ?? Random().nextDouble;
 
   /// `{'deviceClass': 'phone' | 'tablet'}` when the app supplied one (contract
   /// B14), else empty. Anything else, or a throwing callback, sends nothing.
@@ -641,19 +645,31 @@ class StraitLinks {
         await _writeQueue(pruneOpenQueue([...await _readQueue(), report], _now()));
       });
 
+  // C1: after a 429/5xx the queue waits retryDelayMs (exponential, jittered, at least the
+  // Retry-After) before it sends again; any other answer ends the wait. No answer adds none.
+  int _failures = 0;
+  int _holdUntil = 0;
+
   /// POST /v1/open (or /v1/event for a saved event, B13a); the HTTP status,
   /// or null when there was no answer.
   Future<int?> _sendReport(Map<String, dynamic> report) async {
     try {
+      final _Res res;
       if (report['type'] == 'event') {
         final event = {'publishableKey': publishableKey, ...report}
           ..remove('type')
           ..remove('at');
-        return (await _call('POST', '/v1/event', event)).status;
+        res = await _call('POST', '/v1/event', event);
+      } else {
+        // B14: deviceClass is added at send time, never saved in the queue.
+        res = await _call('POST', '/v1/open', {'publishableKey': publishableKey, ...report, ..._deviceClassField()});
       }
-      // B14: deviceClass is added at send time, never saved in the queue.
-      return (await _call('POST', '/v1/open', {'publishableKey': publishableKey, ...report, ..._deviceClassField()}))
-          .status;
+      if (shouldRetryReport(res.status)) {
+        _holdUntil = _now() + retryDelayMs(++_failures, res.retryAfter, _random());
+      } else {
+        _failures = _holdUntil = 0;
+      }
+      return res.status;
     } catch (_) {
       return null;
     }
@@ -677,18 +693,18 @@ class StraitLinks {
   /// Send saved open reports now (also happens on start and on resume).
   /// Never throws.
   Future<void> flushOpenReports() => _flushing ??= _serial(() async {
+        if (_now() < _holdUntil) return; // C1: the server asked us to wait
         final queue = pruneOpenQueue(await _readQueue(), _now());
         final keep = <Map<String, dynamic>>[];
-        var offline = false;
+        var stop = false;
         for (final rep in queue) {
-          // Once one gets no answer at all, keep the rest for later.
-          if (offline) {
+          // Once one gets no answer, a 429 or a 5xx, keep the rest for later.
+          if (stop) {
             keep.add(rep);
             continue;
           }
-          final status = await _sendReport(rep);
-          offline = status == null;
-          if (shouldRetryReport(status)) keep.add(rep);
+          stop = shouldRetryReport(await _sendReport(rep));
+          if (stop) keep.add(rep);
         }
         await _writeQueue(keep);
       }).whenComplete(() => _flushing = null);
@@ -859,7 +875,7 @@ class StraitLinks {
     } catch (_) {
       json = <String, dynamic>{};
     }
-    return _Res(res.statusCode >= 200 && res.statusCode < 300, res.statusCode, json);
+    return _Res(res.statusCode >= 200 && res.statusCode < 300, res.statusCode, json, res.headers['retry-after']);
   }
 }
 
@@ -867,7 +883,8 @@ class _Res {
   final bool ok;
   final int status;
   final Map<String, dynamic> json;
-  const _Res(this.ok, this.status, this.json);
+  final String? retryAfter;
+  const _Res(this.ok, this.status, this.json, [this.retryAfter]);
 }
 
 class _Dest {

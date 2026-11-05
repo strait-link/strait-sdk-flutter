@@ -24,8 +24,8 @@ void main() async {
     ]));
   });
 
-  test('vectors v10', () {
-    expect(v['version'], 10);
+  test('vectors v11', () {
+    expect(v['version'], 11);
   });
 
   group('firstLaunchState (B6a)', () {
@@ -171,6 +171,15 @@ void main() async {
     for (final c in v['retry'] as List) {
       test('${c['status']}', () {
         expect(shouldRetryReport(c['status'] as int?), c['expected']);
+      });
+    }
+  });
+
+  group('retryDelayMs (B14 backoff, C1)', () {
+    for (final c in v['retryDelay'] as List) {
+      test('${c['name']}', () {
+        expect(retryDelayMs(c['failures'] as int, c['retryAfter'] as String?, (c['random'] as num).toDouble()),
+            c['expected']);
       });
     }
   });
