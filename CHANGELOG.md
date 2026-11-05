@@ -4,7 +4,8 @@
 
 - Fix (privacy): the legacy `resolveDeferredLink` ignored the opt-out switch and still called `/v1/match`
   (one install row per call). It now takes `storage` (pass the one you give `StraitLinks`); while
-  `setEnabled(false)` is set there it sends nothing and returns `MatchResult.none`.
+  `setEnabled(false)` is set there it sends nothing and returns `MatchResult.none`. **Action required** if
+  you call it and use the opt-out: pass `storage`, or it can't see the switch and still runs.
 - Fix (Flutter web): a short link handed to `handleUrl` on the web now asks `/v1/lookup` (key + host + path),
   which records nothing. It used to call `/v1/resolve` without an openId, which the engine counts as a tap
   (and fires `link.clicked`), although the SDK said it recorded nothing. A lookup with no answer is
