@@ -62,3 +62,10 @@ the one engine call allowed while off; it bypasses the opt-out gate by name, not
   queue's own gate). Now a failed resolve re-reads the switch and, when off, routes through `/v1/lookup`.
   A resolve reply that lands after the switch went off still routes (the engine already has it; that request
   left while on), but its tap id is no longer remembered.
+
+## Update 5 Nov 2026: follow-up F5, the legacy `resolveDeferredLink`
+The older one-call API had no storage and so never saw the switch: an opted-out app that still called it
+posted `/v1/match`, which records an install. It now takes `storage` (the one passed to `StraitLinks`) and
+returns `MatchResult.none` with no call while `strait.enabled` is `'0'` there. Unreadable storage counts as on,
+as in `StraitLinks`. Without `storage` it can't read the switch (the `StraitLinks` default is in memory); the
+README says to pass it. Same fix as React Native (its ADR 0002) and Swift.
