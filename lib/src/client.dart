@@ -292,7 +292,11 @@ class StraitLinks {
   /// The once-per-install check; marked done only once the engine answered (offline → next launch).
   Future<void> _firstCheck() async {
     final e = await _runDeferred(true);
-    if (e.reason != 'network') await _setFlag();
+    if (e.reason == 'disabled') {
+      _deferredDue = true; // switched off meanwhile: runs when back on
+    } else if (e.reason != 'network') {
+      await _setFlag();
+    }
   }
 
   /// Opt-out switch for consent flows (default on, kept in `storage` across
