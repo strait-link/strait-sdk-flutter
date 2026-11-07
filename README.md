@@ -67,7 +67,7 @@ curl -s https://<your-handle>.strait.link/v1/resolve -H 'Content-Type: applicati
 | Android: direct links and deferred links | ● Live | App Links, custom schemes, Play Install Referrer. |
 | iPhone links (Universal Links) | ● Live | The links themselves (Apple's Universal Links plus our association file) were proven on a real iPhone with the Swift reference app on 21 Oct 2026. This SDK's iOS glue is covered by unit tests and hasn't run on a real iPhone. |
 | iPhone: install matching (deferred links) | Opt-in | Off until you choose it. Proven on iPhone simulators; the real-iPhone run waits on our App Store listing. Your choice in Dashboard → Settings → iPhone installs: device matching, paste handoff, both or neither, read from Strait at runtime. Device matching is off by default. iPhone matches are labelled Estimated until measured. |
-| Flutter web | New | Same code. There is no install on the web, so no deferred check runs and no visit counts as an install; a link in the page URL (`AppLinks().getInitialLink()`) opens and reaches `onLink`. Web opens are counted only for landings from a Strait tap (the URL carries `strait_click`), one per tap, and those attribute events; needs engine with web tap ids. The test suite runs in Chrome (dart2js and dart2wasm) in CI. |
+| Flutter web | New | Same code. There is no install on the web, so no deferred check runs and no visit counts as an install; a link in the page URL (`AppLinks().getInitialLink()`) opens and reaches `onLink`. Web opens are counted only for landings from a Strait tap (the URL carries `strait_click`), one per tap, and those attribute events; a short link handed to `handleUrl` on the web is looked up through `/v1/lookup` and counts nothing; needs engine with web tap ids. The test suite runs in Chrome (dart2js and dart2wasm) in CI. |
 | Store sheet: the store inside your app | New | Keeps the deep link through the install. On iPhone it needs your app's App Store ID. |
 | Published on pub.dev | ● Live | `dart pub add strait_sdk` (Flutter: `flutter pub add strait_sdk`). |
 
@@ -172,6 +172,9 @@ Future<StraitLinks> startStrait() async {
       final view = PlatformDispatcher.instance.views.first;
       return deviceClassForSize(view.physicalSize.shortestSide / view.devicePixelRatio);
     },
+    // Your app's version, sent with each open and install report (with the SDK's own
+    // version) so support can answer "which app version?". Leave it out to send none.
+    appVersion: (await PackageInfo.fromPlatform()).version,
   );
 
   // Subscribe before start() so nothing is missed (past events replay anyway).
@@ -331,6 +334,12 @@ shows `SKStoreProductViewController` or `SKOverlay` (sdk-swift's
 The tap is recorded with `sent_to = store_sheet` and is not billed while
 the store sheet is new. It works only where your app is the host: a link tapped inside another
 company's app can't open a store sheet there.
+
+## User consent / opt-out
+
+If your app asks for consent first (for example under India's DPDP Act or a GDPR consent flow in the EU), call `await links.setEnabled(false)` until the person agrees: Strait then sends no open reports or events, does no install matching, and deletes reports waiting on the device. The choice is kept across launches in your `storage`; `setEnabled(true)` turns it back on (default: on) and `isEnabled()` reads it.
+Links that carry their own destination still reach `onLink`. A Strait short link is looked up through the engine's `/v1/lookup`, which records nothing (no tap, no open, no tap id), so it still opens the right screen; only if that lookup fails (offline) does it come back `matched: false, reason: 'disabled'`. Whether you need consent, and for what, is a question for your own legal advice.
+The legacy `resolveDeferredLink` honours the same switch when you pass it the same `storage`: while off it sends nothing (no install) and returns `MatchResult.none`.
 
 ## Check your setup (doctor)
 

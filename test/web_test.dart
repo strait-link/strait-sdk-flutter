@@ -24,14 +24,15 @@ const device = DeviceFields(
   StraitLinks strait,
   List<(String, Map<String, dynamic>?)> calls,
   MemoryStore store
-}) make() {
+}) make([http.Response Function(String path)? reply]) {
   final calls = <(String, Map<String, dynamic>?)>[];
   final client = MockClient((req) async {
     calls.add((
       req.url.path,
       req.body.isEmpty ? null : jsonDecode(req.body) as Map<String, dynamic>
     ));
-    return http.Response(jsonEncode({'ok': true, 'matched': false}), 200);
+    return reply?.call(req.url.path) ??
+        http.Response(jsonEncode({'ok': true, 'matched': false}), 200);
   });
   final store = MemoryStore();
   final strait = StraitLinks(
@@ -91,6 +92,7 @@ void main() {
       'matched': true,
       'firstLaunch': false,
       'at': opens.single.$2!['at'],
+      'sdkVersion': straitSdkVersion,
     });
     expect('web-$tap'.length, 40);
     // Events after the landing are attributed to the tap, like app opens.
@@ -152,16 +154,39 @@ void main() {
     expect(opens.single.$2!['url'], 'https://shop.example.com/p/8');
   });
 
-  test('a short link handed in on the web is looked up but not counted',
+  // F2: the engine counts a /v1/resolve without an openId as a tap (older SDKs), so the web asks
+  // /v1/lookup, which records nothing: key + host + path only, no open report.
+  test('a short link handed in on the web is looked up through /v1/lookup and not counted',
       () async {
-    final h = make();
-    final e = await h.strait.handleUrl('https://acme.strait.link/summer');
+    final h = make((path) => path == '/v1/lookup'
+        ? http.Response(
+            jsonEncode({
+              'matched': true,
+              'longUrl': 'https://shop.example.com/p/8?c=red',
+              'linkId': 'lnk_8'
+            }),
+            200)
+        : http.Response('{}', 202));
+    final e = await h.strait.handleUrl(
+        'https://acme.strait.link/summer?utm_source=sms&x=1');
     await h.strait.flushOpenReports();
     await settle();
+    expect(e.matched, isTrue);
+    expect(e.path, '/p/8');
+    expect(e.linkId, 'lnk_8');
+    expect(h.calls.map((c) => c.$1), ['/v1/lookup']);
+    expect(h.calls.single.$2,
+        {'publishableKey': 'st_pub_test_web', 'url': 'https://acme.strait.link/summer'});
+    expect(await h.strait.pendingOpenReports(), 0);
+  });
+
+  test('a web lookup that gets no answer is reason network, nothing queued',
+      () async {
+    final h = make((_) => throw http.ClientException('offline'));
+    final e = await h.strait.handleUrl('https://acme.strait.link/summer');
+    await settle();
     expect(e.matched, isFalse);
-    final resolve = h.calls.singleWhere((c) => c.$1 == '/v1/resolve').$2!;
-    expect(resolve.containsKey('openId'), isFalse);
-    expect(h.calls.map((c) => c.$1), isNot(contains('/v1/open')));
+    expect(e.reason, 'network');
     expect(await h.strait.pendingOpenReports(), 0);
   });
 }

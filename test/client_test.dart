@@ -97,7 +97,8 @@ const resolved = {
 
 void main() {
   group('direct links', () {
-    test('app closed: a verified link resolves the short URL (B1, B3)', () async {
+    // Native only: the web asks /v1/lookup (web_test.dart).
+    test('app closed: a verified link resolves the short URL (B1, B3)', testOn: 'vm', () async {
       final h = make(FakeEngine(resolved));
       await h.start(initialUrl: 'https://links.test/sale');
       await flush();
@@ -119,7 +120,8 @@ void main() {
       expect(body.containsKey('appId'), isFalse);
     });
 
-    test('app in background: classified as background', () async {
+    // Native only: the web asks /v1/lookup (web_test.dart).
+    test('app in background: classified as background', testOn: 'vm', () async {
       final h = make(FakeEngine(resolved));
       await h.start();
       h.phone.setState(AppLifecycle.background);
@@ -184,7 +186,8 @@ void main() {
       expect(h.engine.calls.where((c) => c.path == '/v1/resolve'), isEmpty);
     });
 
-    test('an expired short link is reported with the engine reason', () async {
+    // Native only: the web asks /v1/lookup (web_test.dart).
+    test('an expired short link is reported with the engine reason', testOn: 'vm', () async {
       final h = make(FakeEngine({
         '/v1/resolve': {'matched': false, 'reason': 'expired'}
       }));
@@ -308,6 +311,7 @@ void main() {
         ...device.toJson(),
         'openId': h.events.first.id,
         'at': h.events.first.at,
+        'sdkVersion': straitSdkVersion,
       });
     });
 
@@ -643,7 +647,8 @@ void main() {
       );
     }
 
-    test('a page.link short link is resolved by the engine (host + code sent)', () async {
+    // Native only: the web asks /v1/lookup (web_test.dart).
+    test('a page.link short link is resolved by the engine (host + code sent)', testOn: 'vm', () async {
       final h = makePageLink(FakeEngine({
         '/v1/resolve': {
           'matched': true,

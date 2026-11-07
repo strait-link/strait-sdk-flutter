@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
+import 'client.dart' show KeyValueStore;
 import 'core.dart';
 
 /// Coarse, privacy-clean device fields the server hashes into a match signature.
@@ -63,6 +64,10 @@ class MatchResult {
 /// `st_pub_test_…`) from Dashboard → Get started. It is safe to ship in apps;
 /// never pass your secret key (`st_live_…`).
 /// Never throws; returns [MatchResult.none] on any error.
+/// [storage]: the one you give [StraitLinks], so its opt-out switch (`setEnabled(false)`, kept as
+/// `strait.enabled`) is honoured here too: while off this sends nothing (no install) and returns
+/// [MatchResult.none]. Left out, the switch can't be read and the check runs.
+/// [appVersion]: your app's version (as for [StraitLinks]); sent with `sdkVersion` (td2-23).
 Future<MatchResult> resolveDeferredLink({
   required String publishableKey,
   required String endpoint,
@@ -70,7 +75,15 @@ Future<MatchResult> resolveDeferredLink({
   required DeviceFields device,
   String? installReferrer,
   http.Client? client,
+  KeyValueStore? storage,
+  String? appVersion,
 }) async {
+  // Opted out (ADR 0001): no referrer or match call. Unreadable storage = on, as in StraitLinks.
+  String? enabled;
+  try {
+    enabled = await storage?.get('strait.enabled');
+  } catch (_) {}
+  if (enabled == '0') return MatchResult.none;
   final ownsClient = client == null;
   final c = client ?? http.Client();
   final base = endpoint.replaceAll(RegExp(r'/+$'), '');
@@ -97,6 +110,7 @@ Future<MatchResult> resolveDeferredLink({
           'publishableKey': publishableKey,
           'linkId': linkId,
           'platform': platform,
+          ...versionFields(appVersion),
         });
         if (r.matched) return r;
       }
@@ -105,6 +119,7 @@ Future<MatchResult> resolveDeferredLink({
       'publishableKey': publishableKey,
       'platform': platform,
       ...device.toJson(),
+      ...versionFields(appVersion),
     });
   } finally {
     if (ownsClient) c.close();

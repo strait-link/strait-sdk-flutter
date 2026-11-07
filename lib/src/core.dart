@@ -248,7 +248,7 @@ String? pageLinkLongLink(SplitUrl p) {
 }
 
 /// What a URL handed to the app means (B3, B4, B22):
-/// - https on a Strait link host → a short link; ask /v1/resolve. Except an
+/// - https on a Strait link host → a short link; ask /v1/resolve (web: /v1/lookup). Except an
 ///   FDL long link on a `*.page.link` link host (B22): its `link=` value IS the
 ///   destination, read on the device with no network call.
 /// - other https → it IS the destination.
@@ -294,6 +294,22 @@ const openQueueMax = 100;
 List<Map<String, dynamic>> pruneOpenQueue(List<Map<String, dynamic>> queue, int now) {
   final fresh = queue.where((r) => now - (r['at'] as num) <= openQueueMaxAgeMs).toList();
   return fresh.length > openQueueMax ? fresh.sublist(fresh.length - openQueueMax) : fresh;
+}
+
+/// This SDK's version, sent as `sdkVersion` with every open and install report
+/// (td2-23). Kept equal to pubspec.yaml's `version` by a test.
+const String straitSdkVersion = '0.10.0';
+
+/// `appVersion` + `sdkVersion` for a call that records an open or install (td2-23). The engine
+/// keeps 1-64 printable ASCII and drops anything else; the app version gets the same rule here:
+/// trimmed and capped at 64, else left out.
+Map<String, String> versionFields(String? appVersion) {
+  var v = appVersion?.trim() ?? '';
+  if (v.length > 64) v = v.substring(0, 64).trimRight();
+  return {
+    if (v.isNotEmpty && RegExp(r'^[\x20-\x7E]+$').hasMatch(v)) 'appVersion': v,
+    'sdkVersion': straitSdkVersion,
+  };
 }
 
 /// Conversion events carry the tap id of the most recent attributed link

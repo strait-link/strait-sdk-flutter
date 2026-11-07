@@ -1,7 +1,37 @@
 # Changelog
 
-## 0.10.0 (5 Nov 2026)
+## 0.10.0 (7 Nov 2026)
 
+- New: every app open and install the SDK reports (`/v1/open`, `/v1/resolve`, `/v1/referrer`, `/v1/match`,
+  `/v1/handoff/claim`) now says which version of your app and of this SDK sent it, so "links stopped working"
+  can be traced to a release. An open saved offline keeps the versions it happened on, even if it is sent
+  after an update. Pass `appVersion:` to `StraitLinks` (for example
+  `PackageInfo.fromPlatform()` from `package_info_plus`; the SDK stays pure Dart and adds no dependency);
+  leave it out and only the SDK version (`straitSdkVersion`) is sent. Trimmed and capped at 64 characters;
+  anything not plain ASCII is left out. Never sent with `/v1/event` or `/v1/lookup`, and nothing is sent
+  while `setEnabled(false)` is set. The legacy `resolveDeferredLink` takes `appVersion` too. ADR 0002.
+- Fix (privacy, F7): switching the SDK off during the first-launch check no longer reads the iPhone clipboard
+  (paste handoff, which shows iOS's paste prompt). The switch is checked before the prompt-free "is there a link?"
+  check and again before the read; nothing is claimed.
+- Fix (privacy): the legacy `resolveDeferredLink` ignored the opt-out switch and still called `/v1/match`
+  (one install row per call). It now takes `storage` (pass the one you give `StraitLinks`); while
+  `setEnabled(false)` is set there it sends nothing and returns `MatchResult.none`. **Action required** if
+  you call it and use the opt-out: pass `storage`, or it can't see the switch and still runs.
+- Fix (Flutter web): a short link handed to `handleUrl` on the web now asks `/v1/lookup` (key + host + path),
+  which records nothing. It used to call `/v1/resolve` without an openId, which the engine counts as a tap
+  (and fires `link.clicked`), although the SDK said it recorded nothing. A lookup with no answer is
+  `reason: 'network'`.
+- Fix: switching the SDK off while a short link's `/v1/resolve` is still out no longer answers
+  `reason: 'network'`; the link routes through `/v1/lookup` as an opted-out tap does, and nothing is queued.
+  A reply that lands after the switch went off keeps no tap.
+- New: `setEnabled(false)`, an opt-out switch for consent flows (DPDP, GDPR). While off the SDK sends
+  no open reports or events and does no deferred or clipboard matching; reports saved on the device and
+  the remembered tap are deleted. Kept across launches (`strait.enabled` in `storage`); `setEnabled(true)`
+  resumes and runs a first-launch check that was skipped while off. `isEnabled()` reads it. Default on.
+  Links that carry their own destination still reach `onLink`. A Strait short link still routes: while
+  off the SDK asks the engine's `/v1/lookup` (key + host + path, no query), which records no tap, open or tap
+  id, and queues no report; if that lookup fails (offline, or an engine without it) the link comes back
+  `reason: 'disabled'`. Flutter web follows the same rules. ADR 0001 (doc/adr); engine ADR 0083.
 - Fix: reinstalls from a link are no longer lost. Android Auto Backup and restored iPhones put back
   the "deferred check done" flag, so a reinstall skipped its deferred link and was never counted.
   New optional `installTime` on `StraitLinks` (e.g. `package_info_plus`
