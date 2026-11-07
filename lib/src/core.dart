@@ -298,7 +298,7 @@ List<Map<String, dynamic>> pruneOpenQueue(List<Map<String, dynamic>> queue, int 
 
 /// This SDK's version, sent as `sdkVersion` with every open and install report
 /// (td2-23). Kept equal to pubspec.yaml's `version` by a test.
-const String straitSdkVersion = '0.10.0';
+const String straitSdkVersion = '0.10.1';
 
 /// `appVersion` + `sdkVersion` for a call that records an open or install (td2-23). The engine
 /// keeps 1-64 printable ASCII and drops anything else; the app version gets the same rule here:

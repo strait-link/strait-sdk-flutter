@@ -45,8 +45,10 @@ signature that drifts from the other languages fails the build.
 
 ## Quick start (60 seconds)
 
-**1. Install.** ```sh
-flutter pub add strait_sdk
+**1. Install** the SDK and the five packages the setup in [Use](#use-recommended-straitlinks) imports:
+
+```sh
+flutter pub add strait_sdk app_links shared_preferences play_install_referrer package_info_plus flutter_timezone
 ```
 
 **2. Check your key and a link.** In **Dashboard → Links**, make a link with the path `summer` and the destination `https://shop.example.com/product/42`. Then ask Strait about it the way this SDK will:
@@ -85,10 +87,17 @@ Or pin it in `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  strait_sdk: ^0.10.0
+  strait_sdk: ^0.10.1
 ```
 
 Pure Dart (no Flutter dependency), so it works in Flutter apps and Dart servers alike.
+
+A Flutter app using the setup in [Use](#use-recommended-straitlinks) also needs the packages it imports
+(without them `flutter run` fails on the imports):
+
+```sh
+flutter pub add app_links shared_preferences play_install_referrer package_info_plus flutter_timezone
+```
 
 ## Use (recommended): `StraitLinks`
 

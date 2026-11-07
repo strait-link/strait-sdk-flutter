@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.10.1 (7 Nov 2026)
+
+- README: the Quick start install step renders as a code block again (the fence sat on the same line as
+  "1. Install." and broke the page on pub.dev), and it installs the five packages the `StraitLinks` setup
+  imports (`app_links`, `shared_preferences`, `play_install_referrer`, `package_info_plus`,
+  `flutter_timezone`). No code change.
+
 ## 0.10.0 (7 Nov 2026)
 
 - New: every app open and install the SDK reports (`/v1/open`, `/v1/resolve`, `/v1/referrer`, `/v1/match`,
