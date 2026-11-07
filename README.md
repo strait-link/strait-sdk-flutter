@@ -85,7 +85,7 @@ Or pin it in `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  strait_sdk: ^0.9.7
+  strait_sdk: ^0.10.0
 ```
 
 Pure Dart (no Flutter dependency), so it works in Flutter apps and Dart servers alike.
@@ -152,6 +152,8 @@ Future<StraitLinks> startStrait() async {
     installReferrer: () async => !kIsWeb && defaultTargetPlatform == TargetPlatform.android
         ? (await PlayInstallReferrer.installReferrer).installReferrer
         : null,
+    // Reinstalls from a link (see "Reinstalls and backups"): the app's install time, epoch ms.
+    installTime: () async => (await PackageInfo.fromPlatform()).installTime?.millisecondsSinceEpoch,
     deviceFields: () {
       final view = PlatformDispatcher.instance.views.first;
       return DeviceFields(
@@ -198,7 +200,13 @@ Notes:
 
 - `app_links` 6+ also emits the launch link on `uriLinkStream`; `start()`
   ignores that first echo, so the launch link is handled once.
-- Analytics: `strait.trackEvent('purchase', value: 49.99, currency: 'USD', linkId: e.linkId)`.
+- Analytics: `strait.trackEvent('purchase', value: 49.99, currency: 'USD', eventId: order.id)`.
+  `eventId` is your id for the conversion (your order id; 1-64 of `A-Z a-z 0-9 _ . : -`): Strait
+  stores each one once, so a retry or a second report of the same order never counts twice. Left
+  out, the SDK makes one. An event that can't be sent (offline, server busy: no answer, 429 or 5xx)
+  is kept with the saved open reports and sent later, for up to 7 days; `trackEvent` then returns
+  `false`, and `pendingOpenReports()` counts it (contract B13a). Refunds are not supported yet.
+  Revenue you must trust (billing, payouts) belongs on your server with the secret key: the app's publishable key is public, so anyone who can guess an order id could send it first.
   The event carries the tap id of the last attributed link open for 7 days, so
   the dashboard can place revenue on that tap's channel and A/B variant
   (B15/B16). Every attributed open supplies one: a browser hand-off, a Play
@@ -207,8 +215,21 @@ Notes:
 - Fingerprint debug: `strait.reportFingerprint()` then `strait.compareFingerprint()`.
 - `strait.checkDeferred()` re-runs the deferred check (debugging); it doesn't
   touch the once-per-install flag and never records an install.
+- `PackageInfo.installTime` needs `package_info_plus` 8.1 or later; it is null where the
+  platform can't tell, and the SDK then keeps the once-per-install flag alone.
 - `flutter_timezone` 5.0 and later returns a `TimezoneInfo` (hence `.identifier`);
   4.x and earlier return the `String` itself, so drop `.identifier` there.
+
+### Reinstalls and backups (`installTime`, contract B6a)
+
+Android backs up app storage (Auto Backup, on by default) and puts it back when the app is installed
+again, on the same phone or a new one; restored iPhones bring it back too. Without `installTime` the
+restored "deferred check done" flag (`strait.deferredChecked`) makes a reinstall from a link skip its
+deferred link and go uncounted. With it, the SDK stores the install time next to the flag
+(`strait.installTime`) and runs the check again when the install time changed. An app update keeps
+its install time, so it never counts as a new install, and an app updated from an older SDK adopts
+the time without a new check. Optional extra on Android: exclude the `shared_preferences` file
+(`FlutterSharedPreferences.xml`) from backup in your `dataExtractionRules` / `fullBackupContent`.
 
 ### Old Firebase page.link links (contract B22)
 
@@ -240,7 +261,10 @@ Every time a link opens the app, the SDK reports it once (contract B14):
 Reports that can't be sent (offline, server busy) are saved in `storage`
 (key `strait.pendingOpens`, so pass a persistent `KeyValueStore`) and retried
 on the next `start()`, whenever the `lifecycle` stream reports `active`, and
-after any report that gets through, for up to 7 days (max 100). The engine
+after any report that gets through, for up to 7 days (max 100). When the
+server is busy (429 or 5xx) the SDK waits before sending the saved ones again:
+15–30 s, doubling each time in a row up to 1 hour, and at least as long as the
+server's `Retry-After`. The engine
 de-duplicates by open id (`LinkEvent.id`), so nothing is counted twice.
 Navigation never waits for a report. The first launch of an install is marked
 as such, so dashboards can tell **new users** (installed and opened) from
@@ -381,13 +405,15 @@ the Strait SDK contract:
 B1 (publishableKey on every call) · B2 (`browserScreenWidth`) · B3 (short links
 → `/v1/resolve`, engine reason reported) · B4 (`classifyUrl`, tap id removed via
 `takeClickId`) · B5 (`AppStateTracker`) · B6 (once per install,
-skipped-but-marked on a link launch, marked only once the engine answered) ·
+skipped-but-marked on a link launch, marked only once the engine answered) · B6a (reinstall-safe
+first open: `installTime`, `strait.installTime`, `firstLaunchState`) ·
 B7 (Install Referrer → `/v1/referrer` with `parseStraitClick`, else
 `/v1/match`) · B8 (iOS `/v1/match`) · B9 (one `LinkEvent` type, replay,
 `onLinkStart`) · B10 (never throws) · B11 (`jsonEncode`) · B12 (`splitUrl`, no
-`Uri` parsing) · B13 (`trackEvent`, `reportFingerprint`, `compareFingerprint`)
+`Uri` parsing) · B13 (`trackEvent`, `reportFingerprint`, `compareFingerprint`) · B13a (`trackEvent` `eventId`,
+`newEventId`, events kept in the open-report queue)
 · B14 (every open reported once, `strait.pendingOpens` retry queue,
-`pendingOpenReports`, `flushOpenReports`, `deviceClass` / `deviceClassForSize`) · B15 (events carry the remembered
+`pendingOpenReports`, `flushOpenReports`, `deviceClass` / `deviceClassForSize`; C1 backoff on 429/5xx, `retryDelayMs`) · B15 (events carry the remembered
 tap id, `strait.lastTap`, `eventClickId`) · B16 (the tap id from the
 `/v1/resolve`, `/v1/match` and `/v1/referrer` replies, `replyClickId`) · B17
 (portrait screen width, `portraitScreenWidth`) · B18 (reported and queued URLs
@@ -396,7 +422,7 @@ taps are deleted, `staleTap`) · B19 (iPhone paste handoff, chosen in the dashbo
 `parseHandoffUrl`, `/v1/handoff/claim`, `claimHandoff`) · B22 (old Firebase
 page.link links: short → `/v1/resolve`, long → `link=` read on the device) · B23
 (`doctor()` setup check, `doctorFindings`). Both
-shared vector files (conformance v8) are asserted in `dart test`.
+shared vector files (conformance v11) are asserted in `dart test`.
 
 ## iPhone deferred links (opt-in): you choose the method (B19)
 

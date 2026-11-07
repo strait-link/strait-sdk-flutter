@@ -16,15 +16,17 @@ import 'package:strait_sdk/src/core.dart';
 const pk = 'st_pub_test_appowner01';
 const endpoint = 'https://links.test';
 const click = '3f2a9c1e-7b4d-4e8a-9c0f-1a2b3c4d5e6f';
+const hour = 3600000;
 final openIdRe = RegExp(r'^o_[a-z0-9]+_[a-z0-9]{12}$');
 const device = DeviceFields(
     screenWidth: 411, pixelRatio: 2.625, language: 'en', timezone: 'Asia/Kolkata');
 
-/// An engine answer: status + JSON body, or [offline] (no answer) / [hang].
+/// An engine answer: status + JSON body (+ headers), or [offline] (no answer) / [hang].
 class Reply {
   final int status;
   final Object? body;
-  const Reply([this.status = 200, this.body]);
+  final Map<String, String> headers;
+  const Reply([this.status = 200, this.body, this.headers = const {}]);
 }
 
 const offline = 'offline';
@@ -49,7 +51,7 @@ class FakeEngine {
     if (r == offline) throw http.ClientException('Network request failed');
     if (r == hang) return Completer<http.Response>().future;
     r as Reply;
-    return http.Response(jsonEncode(r.body ?? {}), r.status);
+    return http.Response(jsonEncode(r.body ?? {}), r.status, headers: r.headers);
   });
 
   List<Call> of(String path) => calls.where((c) => c.path == path).toList();
@@ -84,7 +86,7 @@ class Harness {
   }
 }
 
-Harness make(FakePhone phone, FakeEngine engine, [MemoryStore? storage]) {
+Harness make(FakePhone phone, FakeEngine engine, [MemoryStore? storage, double Function()? random]) {
   final s = storage ?? MemoryStore();
   return Harness(
     phone,
@@ -97,6 +99,7 @@ Harness make(FakePhone phone, FakeEngine engine, [MemoryStore? storage]) {
       installReferrer: () async => phone.referrer,
       client: engine.client,
       now: () => phone.t,
+      random: random,
     ),
     s,
   );
@@ -257,9 +260,118 @@ void main() {
       await settle();
       expect(await h.strait.pendingOpenReports(), 1);
       engine.routes['/v1/open'] = const Reply(429);
+      phone.advance(hour); // past the backoff hold (C1)
       await h.strait.flushOpenReports();
       expect(await h.strait.pendingOpenReports(), 1);
       engine.routes['/v1/open'] = const Reply(400, {'error': 'bad'});
+      phone.advance(hour);
+      await h.strait.flushOpenReports();
+      expect(await h.strait.pendingOpenReports(), 0);
+    });
+
+    // C1: a server under load (429/5xx) is not hammered by every phone's queue.
+    Future<void> queueThree(FakePhone phone, FakeEngine engine, Harness h) async {
+      engine.routes['/v1/open'] = offline;
+      for (final p in [1, 2, 3]) {
+        phone.tap('straitlink://a.b/$p');
+      }
+      await settle();
+      expect(await h.strait.pendingOpenReports(), 3);
+      engine.calls.clear();
+    }
+
+    test('stops the flush at the first 429 or 5xx; the rest stay saved and unsent', () async {
+      final phone = FakePhone();
+      final engine = FakeEngine({});
+      final h = make(phone, engine, returning());
+      await h.start();
+      await queueThree(phone, engine, h);
+      engine.routes['/v1/open'] = const Reply(503);
+      await h.strait.flushOpenReports();
+      expect(engine.of('/v1/open'), hasLength(1));
+      expect(await h.strait.pendingOpenReports(), 3);
+    });
+
+    test('holds the queue for the Retry-After of a 429 (start, foreground and flushOpenReports all wait)', () async {
+      final phone = FakePhone();
+      final engine = FakeEngine({});
+      final h = make(phone, engine, returning());
+      await h.start();
+      await queueThree(phone, engine, h);
+      engine.routes['/v1/open'] = const Reply(429, null, {'retry-after': '120'});
+      await h.strait.flushOpenReports();
+      expect(engine.of('/v1/open'), hasLength(1));
+      engine.routes['/v1/open'] = accepted;
+      phone.advance(119000);
+      await h.strait.flushOpenReports();
+      expect(engine.of('/v1/open'), hasLength(1)); // held
+      phone.setState(AppLifecycle.background);
+      phone.advance(5000);
+      phone.setState(AppLifecycle.active); // foreground at 124 s: past the hold
+      await settle();
+      expect(engine.of('/v1/open'), hasLength(4));
+      expect(await h.strait.pendingOpenReports(), 0);
+    });
+
+    test('waits before 120 s: nothing is sent while held', () async {
+      final phone = FakePhone();
+      final engine = FakeEngine({});
+      final h = make(phone, engine, returning());
+      await h.start();
+      await queueThree(phone, engine, h);
+      engine.routes['/v1/open'] = const Reply(429, null, {'retry-after': '120'});
+      await h.strait.flushOpenReports();
+      engine.routes['/v1/open'] = accepted;
+      phone.advance(119999);
+      await h.strait.flushOpenReports();
+      phone.setState(AppLifecycle.background);
+      phone.setState(AppLifecycle.active);
+      await settle();
+      expect(engine.of('/v1/open'), hasLength(1));
+      phone.advance(1);
+      await h.strait.flushOpenReports();
+      expect(engine.of('/v1/open'), hasLength(4));
+    });
+
+    test('without Retry-After backs off exponentially with jitter (15-30 s, then 30-60 s); an answer resets it', () async {
+      final phone = FakePhone();
+      final engine = FakeEngine({});
+      final h = make(phone, engine, returning(), () => 0); // the shortest jitter: half the step
+      await h.start();
+      await queueThree(phone, engine, h);
+      engine.routes['/v1/open'] = const Reply(503);
+      await h.strait.flushOpenReports(); // failure 1: hold 15 s
+      phone.advance(14999);
+      await h.strait.flushOpenReports();
+      expect(engine.of('/v1/open'), hasLength(1));
+      phone.advance(1);
+      await h.strait.flushOpenReports(); // failure 2: hold 30 s
+      expect(engine.of('/v1/open'), hasLength(2));
+      phone.advance(29999);
+      await h.strait.flushOpenReports();
+      expect(engine.of('/v1/open'), hasLength(2));
+      phone.advance(1);
+      engine.routes['/v1/open'] = accepted;
+      await h.strait.flushOpenReports(); // answered: sent, hold cleared
+      expect(engine.of('/v1/open'), hasLength(5));
+      engine.routes['/v1/open'] = const Reply(502);
+      phone.tap('straitlink://a.b/4'); // live report fails: failure 1 again (15 s, not 60 s)
+      await settle();
+      engine.routes['/v1/open'] = accepted;
+      phone.advance(15000);
+      await h.strait.flushOpenReports();
+      expect(await h.strait.pendingOpenReports(), 0);
+    });
+
+    test('no answer (offline) adds no hold: the next foreground sends', () async {
+      final phone = FakePhone();
+      final engine = FakeEngine({});
+      final h = make(phone, engine, returning());
+      await h.start();
+      await queueThree(phone, engine, h);
+      await h.strait.flushOpenReports(); // still offline: stops at the first
+      expect(engine.of('/v1/open'), hasLength(1));
+      engine.routes['/v1/open'] = accepted;
       await h.strait.flushOpenReports();
       expect(await h.strait.pendingOpenReports(), 0);
     });

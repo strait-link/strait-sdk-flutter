@@ -504,6 +504,7 @@ void main() {
         'value': 49.99,
         'currency': 'USD',
         'linkId': 'lnk_42',
+        'eventId': matches(RegExp(r'^e_[a-z0-9]+_[a-z0-9]{12}$')), // B13a: made by the SDK
       });
     });
   });

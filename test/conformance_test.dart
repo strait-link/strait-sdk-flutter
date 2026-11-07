@@ -24,6 +24,25 @@ void main() async {
     ]));
   });
 
+  test('vectors v11', () {
+    expect(v['version'], 11);
+  });
+
+  group('firstLaunchState (B6a)', () {
+    for (final c in v['firstLaunchState'] as List) {
+      test('${c['name']}', () {
+        final e = c['expected'] as Map<String, dynamic>;
+        expect(
+            firstLaunchState(c['flag'] as String?, c['stored'] as String?, c['installTime'] as num?),
+            (
+              firstLaunch: e['firstLaunch'] as bool,
+              clearFlag: e['clearFlag'] as bool,
+              storeInstallTime: e['storeInstallTime'] as String?,
+            ));
+      });
+    }
+  });
+
   group('eventClickId (B15)', () {
     for (final c in v['eventClickId'] as List) {
       test('${c['name']}', () {
@@ -152,6 +171,15 @@ void main() async {
     for (final c in v['retry'] as List) {
       test('${c['status']}', () {
         expect(shouldRetryReport(c['status'] as int?), c['expected']);
+      });
+    }
+  });
+
+  group('retryDelayMs (B14 backoff, C1)', () {
+    for (final c in v['retryDelay'] as List) {
+      test('${c['name']}', () {
+        expect(retryDelayMs(c['failures'] as int, c['retryAfter'] as String?, (c['random'] as num).toDouble()),
+            c['expected']);
       });
     }
   });

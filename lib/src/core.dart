@@ -4,7 +4,7 @@
 library;
 
 import 'dart:convert' show jsonDecode, jsonEncode;
-import 'dart:math' show Random;
+import 'dart:math' show Random, max, min;
 
 /// How the app received a link.
 enum LinkRoute {
@@ -298,7 +298,7 @@ List<Map<String, dynamic>> pruneOpenQueue(List<Map<String, dynamic>> queue, int 
 
 /// This SDK's version, sent as `sdkVersion` with every open and install report
 /// (td2-23). Kept equal to pubspec.yaml's `version` by a test.
-const String straitSdkVersion = '0.9.7';
+const String straitSdkVersion = '0.10.0';
 
 /// `appVersion` + `sdkVersion` for a call that records an open or install (td2-23). The engine
 /// keeps 1-64 printable ASCII and drops anything else; the app version gets the same rule here:
@@ -394,6 +394,31 @@ String? replyReferralCode(Object? reply) =>
 /// Whether a failed report should be kept for retry: no answer, 429 or 5xx.
 bool shouldRetryReport(int? status) => status == null || status == 429 || status >= 500;
 
+/// C1 backoff: the first hold after a 429/5xx is 15-30 s; each one in a row doubles it, up to [retryMaxMs].
+const retryBaseMs = 30000;
+
+/// C1 backoff: never hold the queue longer than 1 hour (Retry-After included).
+const retryMaxMs = 3600000;
+
+final _retryAfterRe = RegExp(r'^[0-9]{1,9}$');
+
+/// How long to hold the open/event queue after the [failures]-th 429/5xx
+/// answer in a row (contract B14, C1). Exponential with equal jitter:
+/// step = min([retryMaxMs], [retryBaseMs] × 2^(failures−1)), wait
+/// floor(step/2 + random × step/2), so phones that failed together spread
+/// out. A [retryAfter] in whole seconds (1-9 ASCII digits, spaces trimmed; an
+/// HTTP date or anything else is ignored) is a floor. The result never
+/// exceeds [retryMaxMs]. [random] is in [0, 1] (the platform's random number).
+int retryDelayMs(int failures, String? retryAfter, double random) {
+  final n = failures.clamp(1, 17);
+  final half = min(retryMaxMs, retryBaseMs * (1 << (n - 1))) / 2;
+  final r = random.clamp(0.0, 1.0);
+  final backoff = (half + r * half).floor();
+  final s = retryAfter?.trim();
+  final server = s != null && _retryAfterRe.hasMatch(s) ? min(int.parse(s), retryMaxMs ~/ 1000) * 1000 : 0;
+  return min(retryMaxMs, max(backoff, server));
+}
+
 final _rng = Random();
 
 /// A unique id for one link open (the engine de-duplicates retries by it).
@@ -405,6 +430,31 @@ String newOpenId(int now, [double Function()? random]) {
     r.write(chars[(next() * 36).floor()]);
   }
   return 'o_${now.toRadixString(36)}_$r';
+}
+
+/// A unique id for one conversion event when the app gives none (contract
+/// B13a): the engine stores an eventId once, so a retried send is never
+/// counted twice. Same shape as [newOpenId].
+String newEventId(int now, [double Function()? random]) => 'e${newOpenId(now, random).substring(1)}';
+
+/// What `start()` does with the once-per-install flag (contract B6a, shared-spec ADR 0003):
+/// [firstLaunch] = run the deferred check / count this launch as the install's first;
+/// [clearFlag] = set `strait.deferredChecked` to '' first (the storage came back from
+/// another install); then write [storeInstallTime] to `strait.installTime` (null = leave it).
+typedef FirstLaunchState = ({bool firstLaunch, bool clearFlag, String? storeInstallTime});
+
+/// B6a: storage restored from a backup of another install (Android Auto Backup, a restored
+/// phone) brings back `strait.deferredChecked`. The app's install time, stored next to it,
+/// tells: a different stored time = a new install, so the check runs again. No stored time
+/// (an app updated from an older SDK) = adopt it, never a new install. Unknown install time
+/// (null, 0, negative, not finite) = the B6 rule alone.
+FirstLaunchState firstLaunchState(String? flag, String? storedInstallTime, num? installTime) {
+  final t = installTime != null && installTime.isFinite && installTime >= 1 ? '${installTime.truncate()}' : null;
+  final stored = storedInstallTime == null || storedInstallTime.isEmpty ? null : storedInstallTime;
+  if (flag != '1') return (firstLaunch: true, clearFlag: false, storeInstallTime: t != null && t != stored ? t : null);
+  if (t == null || t == stored) return (firstLaunch: false, clearFlag: false, storeInstallTime: null);
+  if (stored == null) return (firstLaunch: false, clearFlag: false, storeInstallTime: t);
+  return (firstLaunch: true, clearFlag: true, storeInstallTime: t);
 }
 
 /// A link arriving this soon after the app came back to the front came "from background".
