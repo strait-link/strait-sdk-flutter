@@ -101,7 +101,7 @@ List<DoctorFinding> _hostFindings(bool ios, String host, String? appId, List<Str
           'Check that endpoint is your link domain (Dashboard → Get started) and that this device is online.')
     ];
   }
-  final apps = file.status == 200 ? _listedApps(ios, file.body) : null;
+  final apps = file.status == 200 ? _listedApps(ios, file.body) : (_notConfigured(file) ? <String, List<String>>{} : null);
   if (apps == null) {
     return [
       _err('host.file_missing', "$host doesn't serve ${ios ? 'apple-app-site-association' : 'assetlinks.json'}",
@@ -109,7 +109,13 @@ List<DoctorFinding> _hostFindings(bool ios, String host, String? appId, List<Str
     ];
   }
   if (apps.isEmpty) {
-    return [_err('app.none', 'No ${ios ? 'iOS' : 'Android'} app is set up for $host', 'Add your app in Dashboard → Apps & stores.')];
+    return [
+      _err(
+          'app.none',
+          'No ${ios ? 'iOS' : 'Android'} app is set up for $host',
+          'Fill in Dashboard → Apps & stores (${ios ? 'Team ID and bundle ID' : 'package name and SHA-256 fingerprint'}), wait a minute, then check again. '
+              'Already done? Make sure $host is your link domain from Dashboard → Get started.')
+    ];
   }
 
   final listed = apps.keys.join(', ');
@@ -134,6 +140,10 @@ List<DoctorFinding> _hostFindings(bool ios, String host, String? appId, List<Str
   }
   return out;
 }
+
+/// A Strait link domain answers 404 {"error":"not configured"} until Apps & stores has this platform's app.
+/// Compared byte for byte (what the engine's well-known route sends), so every SDK agrees on any other body.
+bool _notConfigured(DoctorFile file) => file.status == 404 && file.body == '{"error":"not configured"}';
 
 /// Android: package → fingerprints; iOS: full appIDs (value unused), in file
 /// order. Null = not the JSON expected.
