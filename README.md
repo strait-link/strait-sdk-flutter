@@ -43,9 +43,9 @@ the shared Strait signature recipe and is checked against the **same golden vect
 as the server, web, and React Native SDKs (run by `dart test` in CI), so a
 signature that drifts from the other languages fails the build.
 
-## Fastest: let the CLI set it up (about 5 minutes)
+## Set it up with one command
 
-In your app's folder (Flutter; Node 18.17 or newer, nothing to install first), with the publishable key from **Dashboard → Get started**:
+The 5-minute path. In your app's folder (Flutter; Node 18.17 or newer, nothing to install first), with the publishable key from **Dashboard → Get started**:
 
 ```sh
 npx @straitlink/cli init --key st_pub_live_… --host <your-handle>.strait.link --dry-run   # show what it will write
@@ -58,7 +58,7 @@ It finds your app from its files, writes `lib/links.dart` with your key, link ad
 npx @straitlink/cli doctor --host <your-handle>.strait.link --android <your.package> --ios <your.bundle.id>
 ```
 
-Rather do it by hand? The quick start below is the same setup, step by step.
+Rather do it by hand? Follow the quick start below.
 
 ## Quick start (60 seconds)
 

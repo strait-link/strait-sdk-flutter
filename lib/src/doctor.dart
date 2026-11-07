@@ -141,19 +141,12 @@ List<DoctorFinding> _hostFindings(bool ios, String host, String? appId, List<Str
   return out;
 }
 
+/// A Strait link domain answers 404 {"error":"not configured"} until Apps & stores has this platform's app.
+/// Compared byte for byte (what the engine's well-known route sends), so every SDK agrees on any other body.
+bool _notConfigured(DoctorFile file) => file.status == 404 && file.body == '{"error":"not configured"}';
+
 /// Android: package → fingerprints; iOS: full appIDs (value unused), in file
 /// order. Null = not the JSON expected.
-/// A Strait link domain answers 404 {"error":"not configured"} until Apps & stores has this platform's app.
-bool _notConfigured(DoctorFile file) {
-  if (file.status != 404) return false;
-  try {
-    final json = jsonDecode(file.body ?? '');
-    return json is Map && json['error'] == 'not configured';
-  } catch (_) {
-    return false;
-  }
-}
-
 Map<String, List<String>>? _listedApps(bool ios, String? body) {
   Object? json;
   try {
