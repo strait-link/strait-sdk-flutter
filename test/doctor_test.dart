@@ -121,7 +121,8 @@ void main() {
         expect(
             r.findings[1],
             errF('app.none', 'No ${platform == 'android' ? 'Android' : 'iOS'} app is set up for acme.strait.link',
-                'Add your app in Dashboard → Apps & stores.'));
+                'Fill in Dashboard → Apps & stores (${platform == 'android' ? 'package name and SHA-256 fingerprint' : 'Team ID and bundle ID'}), '
+                'wait a minute, then check again. Already done? Make sure acme.strait.link is your link domain from Dashboard → Get started.'));
         expect(r.ok, isFalse);
       });
     });
