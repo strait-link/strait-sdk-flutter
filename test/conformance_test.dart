@@ -18,14 +18,22 @@ void main() async {
     expect(openQueueMax, c['OPEN_QUEUE_MAX']);
     expect(openQueueMaxAgeMs, c['OPEN_QUEUE_MAX_AGE_MS']);
     expect(attributionWindowMs, c['ATTRIBUTION_WINDOW_MS']);
+    expect(installReferrerMax, c['INSTALL_REFERRER_MAX']);
     expect(c.keys, unorderedEquals([
       'RESUME_WINDOW_MS', 'TRANSIENT_PAUSE_MS', 'OPEN_QUEUE_MAX', 'OPEN_QUEUE_MAX_AGE_MS',
-      'ATTRIBUTION_WINDOW_MS'
+      'ATTRIBUTION_WINDOW_MS', 'INSTALL_REFERRER_MAX'
     ]));
   });
 
-  test('vectors v11', () {
-    expect(v['version'], 11);
+  test('vectors v12', () {
+    expect(v['version'], 12);
+  });
+
+  group('installReferrer (B26)', () {
+    final cases = v['installReferrer'] as List;
+    for (var i = 0; i < cases.length; i++) {
+      test('#$i', () => expect(installReferrerField(cases[i]['input'] as String?), cases[i]['expected']));
+    }
   });
 
   group('firstLaunchState (B6a)', () {

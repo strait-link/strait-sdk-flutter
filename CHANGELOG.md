@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.10.6 (9 Nov 2026)
+
+- The install now keeps its campaign. On Android's first launch the SDK sends the Google Play install referrer your
+  `installReferrer` callback returns (`installReferrer`, contract B26, shared-spec ADR 0008) with the call that records
+  the install (`StraitLinks` and the legacy `resolveDeferredLink`), so Strait can show which campaign brought it
+  (`utm_source`, `utm_medium`, `utm_campaign`, `utm_term`, `utm_content`) even when the ad never went through a Strait
+  link. Strait keeps only those five tags; `gclid` and everything else is dropped on arrival and the raw string is never
+  stored. Not sent on `checkDeferred()`, on iPhone, when longer than 4096 characters, or while switched off
+  (`setEnabled(false)` sends nothing at all, as before).
+
 ## 0.10.5 (9 Nov 2026)
 
 - The SDK now names itself when it reports an app open or install: `sdkVersion` is `flutter/0.10.5`, not a bare

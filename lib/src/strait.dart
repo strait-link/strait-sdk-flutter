@@ -102,6 +102,8 @@ Future<MatchResult> resolveDeferredLink({
     }
   }
 
+  // B26: the raw Play referrer rides on both calls (each records the install), so the install keeps its campaign.
+  final raw = platform == 'android' ? installReferrerField(installReferrer) : null;
   try {
     if (platform == 'android') {
       final linkId = parseStraitLink(installReferrer);
@@ -111,6 +113,7 @@ Future<MatchResult> resolveDeferredLink({
           'linkId': linkId,
           'platform': platform,
           ...versionFields(appVersion),
+          if (raw != null) 'installReferrer': raw,
         });
         if (r.matched) return r;
       }
@@ -120,6 +123,7 @@ Future<MatchResult> resolveDeferredLink({
       'platform': platform,
       ...device.toJson(),
       ...versionFields(appVersion),
+      if (raw != null) 'installReferrer': raw,
     });
   } finally {
     if (ownsClient) c.close();

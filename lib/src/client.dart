@@ -530,11 +530,14 @@ class StraitLinks {
     var pasteOn = false;
     // Signal matching (B7 referrer / B8 match). Returns the event, not emitted.
     Future<LinkEvent> signal() async {
+      // B26: the raw Play referrer rides on the calls that record the install, so the install keeps its campaign.
+      String? installReferrer;
       if (platform == 'android') {
         String? referrer;
         try {
           referrer = await _installReferrer?.call();
         } catch (_) {}
+        if (record) installReferrer = installReferrerField(referrer);
         final linkId = parseStraitLink(referrer);
         if (linkId != null) {
           final clickId = parseStraitClick(referrer);
@@ -544,6 +547,7 @@ class StraitLinks {
             if (clickId != null) 'clickId': clickId,
             'platform': 'android',
             ...tag,
+            if (installReferrer != null) 'installReferrer': installReferrer,
           });
           if (r.json['matched'] == true) {
             if (record) _noteTap(replyClickId(r.json['clickId'], clickId), t0);
@@ -563,6 +567,7 @@ class StraitLinks {
         'platform': platform,
         ..._device().toJson(),
         ...tag,
+        if (installReferrer != null) 'installReferrer': installReferrer,
       };
       var r = await answered('/v1/match', body);
       pasteOn = pasteHandoffOn(r.json);

@@ -298,7 +298,15 @@ List<Map<String, dynamic>> pruneOpenQueue(List<Map<String, dynamic>> queue, int 
 
 /// This SDK's version, sent as `sdkVersion` = `flutter/<it>` with every open and install report
 /// (td2-23, B25). Kept equal to pubspec.yaml's `version` by a test.
-const String straitSdkVersion = '0.10.5';
+const String straitSdkVersion = '0.10.6';
+
+/// The longest Play install referrer the engine reads (engine ADR 0106); a longer one is not sent.
+const int installReferrerMax = 4096;
+
+/// B26: the raw Play install referrer as sent in `installReferrer` on the calls that record the install: the
+/// string itself when 1..4096 characters, else null (not sent). The engine keeps only its five utm_* tags.
+String? installReferrerField(String? referrer) =>
+    referrer != null && referrer.isNotEmpty && referrer.length <= installReferrerMax ? referrer : null;
 
 /// `appVersion` + `sdkVersion` for a call that records an open or install (td2-23). The engine
 /// keeps 1-64 printable ASCII and drops anything else; the app version gets the same rule here:

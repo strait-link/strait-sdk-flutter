@@ -543,6 +543,7 @@ void main() {
         'openId': h.events[0].id,
         'at': h.events[0].at,
         'sdkVersion': 'flutter/$straitSdkVersion',
+        'installReferrer': 'utm_source=google-play&strait_link=lnk_42&strait_click=$click', // B26
       });
       expect(h.events[0].kind, LinkKind.deferred);
       expect(h.events[0].route, LinkRoute.installReferrer);
