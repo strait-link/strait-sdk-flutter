@@ -298,7 +298,7 @@ List<Map<String, dynamic>> pruneOpenQueue(List<Map<String, dynamic>> queue, int 
 
 /// This SDK's version, sent as `sdkVersion` with every open and install report
 /// (td2-23). Kept equal to pubspec.yaml's `version` by a test.
-const String straitSdkVersion = '0.10.2';
+const String straitSdkVersion = '0.10.3';
 
 /// `appVersion` + `sdkVersion` for a call that records an open or install (td2-23). The engine
 /// keeps 1-64 printable ASCII and drops anything else; the app version gets the same rule here:
@@ -509,6 +509,18 @@ final _handoffUrl =
 /// `reply.ios.pasteHandoff`. Only an unmatched reply counts, and a missing
 /// field (an older engine) means off. Read on every check, never stored, so a
 /// dashboard change applies without an app release.
+/// The engine's IPv4-only match URL in an unmatched first-launch `/v1/match` reply (contract B24,
+/// engine ADR 0100), or null. Only an https URL whose path is exactly `/v1/match` (no query, no
+/// fragment, no credentials).
+String? ipv4MatchUrl(Object? value) {
+  if (value is! String || value.length > 200 || !value.startsWith('https://')) return null;
+  final u = Uri.tryParse(value);
+  if (u == null || u.scheme != 'https' || u.host.isEmpty || u.path != '/v1/match' || u.hasQuery || u.hasFragment || u.userInfo.isNotEmpty) {
+    return null;
+  }
+  return value;
+}
+
 bool pasteHandoffOn(Object? reply) {
   if (reply is! Map) return false;
   if (reply['matched'] == true) return false;
