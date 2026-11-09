@@ -311,7 +311,7 @@ void main() {
         ...device.toJson(),
         'openId': h.events.first.id,
         'at': h.events.first.at,
-        'sdkVersion': straitSdkVersion,
+        'sdkVersion': 'flutter/$straitSdkVersion',
       });
     });
 

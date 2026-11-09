@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.10.5 (9 Nov 2026)
+
+- The SDK now names itself when it reports an app open or install: `sdkVersion` is `flutter/0.10.5`, not a bare
+  `0.10.5` (contract B25, shared-spec ADR 0007). The same number can belong to the Android SDK, so Strait couldn't tell
+  which SDK an app runs; now the dashboard can say exactly when your app is on an older Flutter SDK.
+  `straitSdkVersion` is still the plain number. Nothing else changes.
+
 ## 0.10.4 (9 Nov 2026)
 
 - README: Android release builds need `<uses-permission android:name="android.permission.INTERNET"/>` in
