@@ -8,8 +8,7 @@ import 'package:strait_sdk/src/core.dart';
 /// Cross-language contract: the same conformance vectors every Strait SDK
 /// asserts (generated from sdk-react-native/src/core.ts).
 void main() async {
-  final v = jsonDecode(await readFixture('conformance-vectors.json'))
-      as Map<String, dynamic>;
+  final v = jsonDecode(await readFixture('conformance-vectors.json')) as Map<String, dynamic>;
 
   test('constants', () {
     final c = v['constants'] as Map<String, dynamic>;
@@ -20,14 +19,21 @@ void main() async {
     expect(attributionWindowMs, c['ATTRIBUTION_WINDOW_MS']);
     expect(installReferrerMax, c['INSTALL_REFERRER_MAX']);
     expect(userIdMax, c['USER_ID_MAX']);
-    expect(c.keys, unorderedEquals([
-      'RESUME_WINDOW_MS', 'TRANSIENT_PAUSE_MS', 'OPEN_QUEUE_MAX', 'OPEN_QUEUE_MAX_AGE_MS',
-      'ATTRIBUTION_WINDOW_MS', 'INSTALL_REFERRER_MAX', 'USER_ID_MAX'
-    ]));
+    expect(
+        c.keys,
+        unorderedEquals([
+          'RESUME_WINDOW_MS',
+          'TRANSIENT_PAUSE_MS',
+          'OPEN_QUEUE_MAX',
+          'OPEN_QUEUE_MAX_AGE_MS',
+          'ATTRIBUTION_WINDOW_MS',
+          'INSTALL_REFERRER_MAX',
+          'USER_ID_MAX'
+        ]));
   });
 
   test('vectors v14', () {
-    expect(v['version'], 14);
+    expect(v['version'], 15);
   });
 
   group('userId (B27)', () {
@@ -51,13 +57,11 @@ void main() async {
     for (final c in v['firstLaunchState'] as List) {
       test('${c['name']}', () {
         final e = c['expected'] as Map<String, dynamic>;
-        expect(
-            firstLaunchState(c['flag'] as String?, c['stored'] as String?, c['installTime'] as num?),
-            (
-              firstLaunch: e['firstLaunch'] as bool,
-              clearFlag: e['clearFlag'] as bool,
-              storeInstallTime: e['storeInstallTime'] as String?,
-            ));
+        expect(firstLaunchState(c['flag'] as String?, c['stored'] as String?, c['installTime'] as num?), (
+          firstLaunch: e['firstLaunch'] as bool,
+          clearFlag: e['clearFlag'] as bool,
+          storeInstallTime: e['storeInstallTime'] as String?,
+        ));
       });
     }
   });
@@ -65,8 +69,7 @@ void main() async {
   group('eventClickId (B15)', () {
     for (final c in v['eventClickId'] as List) {
       test('${c['name']}', () {
-        expect(eventClickId(c['stored'] as String?, c['now'] as int, c['explicit'] as String?),
-            c['expected']);
+        expect(eventClickId(c['stored'] as String?, c['now'] as int, c['explicit'] as String?), c['expected']);
       });
     }
   });
@@ -82,8 +85,7 @@ void main() async {
   group('parseHandoffUrl (B19)', () {
     for (final c in v['parseHandoffUrl'] as List) {
       test('${c['name']}', () {
-        expect(parseHandoffUrl(c['text'] as String?, (c['linkHosts'] as List).cast<String>()),
-            c['expected']);
+        expect(parseHandoffUrl(c['text'] as String?, (c['linkHosts'] as List).cast<String>()), c['expected']);
       });
     }
   });
@@ -128,9 +130,8 @@ void main() async {
     }
   });
 
-  Map<String, dynamic>? splitJson(SplitUrl? s) => s == null
-      ? null
-      : {'scheme': s.scheme, 'host': s.host, 'path': s.path, 'params': s.params};
+  Map<String, dynamic>? splitJson(SplitUrl? s) =>
+      s == null ? null : {'scheme': s.scheme, 'host': s.host, 'path': s.path, 'params': s.params};
 
   group('splitUrl', () {
     for (final c in v['splitUrl'] as List) {
@@ -180,8 +181,7 @@ void main() async {
     for (final c in v['openQueue'] as List) {
       test(c['name'], () {
         final queue = (c['queue'] as List).cast<Map<String, dynamic>>();
-        expect(pruneOpenQueue(queue, c['now'] as int).map((r) => r['openId']).toList(),
-            c['expected']);
+        expect(pruneOpenQueue(queue, c['now'] as int).map((r) => r['openId']).toList(), c['expected']);
       });
     }
   });
@@ -212,8 +212,7 @@ void main() async {
             : {
                 'route': r.route.value,
                 'needsResolve': r.needsResolve,
-                if (!r.needsResolve)
-                  ...{'url': r.url, 'path': r.path, 'params': r.params, 'clickId': r.clickId},
+                if (!r.needsResolve) ...{'url': r.url, 'path': r.path, 'params': r.params, 'clickId': r.clickId},
               };
         expect(got, c['expected']);
       });

@@ -28,6 +28,7 @@ class SpyClipboard implements StraitClipboard {
   bool probable;
   String? text;
   bool throws;
+
   /// Holds the prompt-free detect until it completes (tests a link arriving meanwhile).
   Future<void>? detectGate;
   int detects = 0;
@@ -52,6 +53,7 @@ class SpyClipboard implements StraitClipboard {
 class Engine {
   final Map<String, Object> routes;
   final Map<String, int> status;
+
   /// Paths whose reply waits for the future (a request held open).
   final Map<String, Future<void>> holds;
   final calls = <MapEntry<String, Map<String, dynamic>?>>[];
@@ -76,12 +78,14 @@ const claimed = {
   'clickId': '3f2a9c1e-7b4d-4e8a-9c0f-1a2b3c4d5e6f',
   'matchMethod': 'clipboard',
 };
+
 /// Paste handoff on (device matching on too, found nothing).
 const noMatch = {
   'matched': false,
   'matchMethod': 'none',
   'ios': {'deviceMatching': true, 'pasteHandoff': true},
 };
+
 /// An older engine: no `ios` field.
 const noMatchOldEngine = {'matched': false, 'matchMethod': 'none'};
 const offOff = {
@@ -158,7 +162,8 @@ void main() {
 
   test('paste handoff on: the debug checkDeferred never touches the clipboard', () async {
     final clip = SpyClipboard();
-    final s = make(Engine({'/v1/match': noMatch}), clip: clip, boost: true, storage: MemoryStore()..data['strait.deferredChecked'] = '1');
+    final s = make(Engine({'/v1/match': noMatch}),
+        clip: clip, boost: true, storage: MemoryStore()..data['strait.deferredChecked'] = '1');
     await s.start();
     await s.checkDeferred();
     expect(clip.detects + clip.reads, 0);
@@ -219,7 +224,9 @@ void main() {
     expect(s.events.single.matched, isTrue);
   });
 
-  test('no answer from /v1/match (5xx): the choice is unknown, the clipboard stays untouched, network, retried next launch', () async {
+  test(
+      'no answer from /v1/match (5xx): the choice is unknown, the clipboard stays untouched, network, retried next launch',
+      () async {
     final storage = MemoryStore();
     final clip = SpyClipboard();
     final e = Engine({'/v1/handoff/claim': claimed}, status: {'/v1/match': 503});
@@ -370,7 +377,12 @@ void main() {
       expect(pasteHandoffOn(offOff), isFalse);
       expect(pasteHandoffOn(deviceOnlyNoMatch), isFalse);
       expect(pasteHandoffOn(noMatchOldEngine), isFalse);
-      expect(pasteHandoffOn({'matched': false, 'ios': {'pasteHandoff': 'true'}}), isFalse);
+      expect(
+          pasteHandoffOn({
+            'matched': false,
+            'ios': {'pasteHandoff': 'true'}
+          }),
+          isFalse);
       expect(pasteHandoffOn(null), isFalse);
     });
   });
@@ -387,7 +399,8 @@ void main() {
     }
 
     /// Starts the check, delivers a link once [held] is true, then opens [gate].
-    Future<(List<LinkEvent>, MemoryStore)> play(Engine e, SpyClipboard clip, Completer<void> gate, bool Function() held) async {
+    Future<(List<LinkEvent>, MemoryStore)> play(
+        Engine e, SpyClipboard clip, Completer<void> gate, bool Function() held) async {
       final storage = MemoryStore();
       final s = make(e, clip: clip, storage: storage);
       final events = <LinkEvent>[];
@@ -401,7 +414,8 @@ void main() {
       return (events, storage);
     }
 
-    List<String> deferredPaths(Engine e) => e.paths.where((p) => p != '/v1/open').toList(); // minus the link's own open report
+    List<String> deferredPaths(Engine e) =>
+        e.paths.where((p) => p != '/v1/open').toList(); // minus the link's own open report
 
     test('link before the clipboard step (/v1/match still waiting): the clipboard is never touched', () async {
       final gate = Completer<void>();
@@ -455,7 +469,9 @@ void main() {
     });
 
     test('refused claim reports the engine reason', () async {
-      final e = Engine({'/v1/handoff/claim': {'matched': false, 'reason': 'handoff_expired'}});
+      final e = Engine({
+        '/v1/handoff/claim': {'matched': false, 'reason': 'handoff_expired'}
+      });
       final ev = await make(e).claimHandoff(handoff);
       expect(ev.reason, 'handoff_expired');
     });

@@ -68,7 +68,9 @@ void main() {
 
   test('a Strait link install: /v1/referrer carries it; unmatched, the /v1/match fallback too', () async {
     final m = Engine((p) => http.Response(
-        jsonEncode(p == '/v1/referrer' ? {'matched': true, 'longUrl': 'https://shop.example/p/1', 'linkId': 'lnk_1'} : {}), 200));
+        jsonEncode(
+            p == '/v1/referrer' ? {'matched': true, 'longUrl': 'https://shop.example/p/1', 'linkId': 'lnk_1'} : {}),
+        200));
     await firstLaunch(make(m, strait));
     expect(m.of('/v1/referrer'), containsPair('installReferrer', strait));
     final u = Engine();
@@ -110,14 +112,23 @@ void main() {
   test('legacy resolveDeferredLink: /v1/referrer and /v1/match carry it; opted out sends nothing', () async {
     final e = Engine();
     await resolveDeferredLink(
-        publishableKey: 'st_pub_test_x', endpoint: 'https://acme.strait.link', platform: 'android',
-        device: device, installReferrer: strait, client: e.client);
+        publishableKey: 'st_pub_test_x',
+        endpoint: 'https://acme.strait.link',
+        platform: 'android',
+        device: device,
+        installReferrer: strait,
+        client: e.client);
     expect(e.of('/v1/referrer'), containsPair('installReferrer', strait));
     expect(e.of('/v1/match'), containsPair('installReferrer', strait));
     final off = Engine();
     await resolveDeferredLink(
-        publishableKey: 'st_pub_test_x', endpoint: 'https://acme.strait.link', platform: 'android',
-        device: device, installReferrer: ads, client: off.client, storage: MemoryStore()..data['strait.enabled'] = '0');
+        publishableKey: 'st_pub_test_x',
+        endpoint: 'https://acme.strait.link',
+        platform: 'android',
+        device: device,
+        installReferrer: ads,
+        client: off.client,
+        storage: MemoryStore()..data['strait.enabled'] = '0');
     expect(off.calls, isEmpty);
   });
 }

@@ -141,8 +141,10 @@ StoreIntent inlineInstallIntent(String pkg, String? referrer, String callerId, [
   return StoreIntent('inline_install', d, _play, {'overlay': true, 'callerId': callerId});
 }
 
-StoreIntent marketIntent(String pkg, [String? referrer]) => StoreIntent('market',
-    'market://details?id=${_enc(pkg)}${referrer != null && referrer.isNotEmpty ? '&referrer=${_enc(referrer)}' : ''}', _play);
+StoreIntent marketIntent(String pkg, [String? referrer]) => StoreIntent(
+    'market',
+    'market://details?id=${_enc(pkg)}${referrer != null && referrer.isNotEmpty ? '&referrer=${_enc(referrer)}' : ''}',
+    _play);
 
 StoreIntent playWebIntent(String pkg, [String? referrer]) => StoreIntent(
     'web',
@@ -152,7 +154,8 @@ StoreIntent playWebIntent(String pkg, [String? referrer]) => StoreIntent(
 
 /// The Android Intents to try, in order. Inline only with a valid callerId.
 List<StoreIntent> androidStorePlan(String pkg, String? referrer,
-    {String? callerId, bool inline = true, String? listing}) => [
+        {String? callerId, bool inline = true, String? listing}) =>
+    [
       if (inline && isPackageName(callerId)) inlineInstallIntent(pkg, referrer, callerId!, listing),
       marketIntent(pkg, referrer),
       playWebIntent(pkg, referrer),
@@ -188,6 +191,7 @@ Future<StoreSheetResult> runStoreSheet({
   required String publishableKey,
   required String platform,
   required Map<String, dynamic> Function() device,
+
   /// Sent as `deviceClass` when 'phone' or 'tablet' (contract B14).
   String? deviceClass,
   required String url,
@@ -201,7 +205,9 @@ Future<StoreSheetResult> runStoreSheet({
   var reply = <String, dynamic>{};
   try {
     final r = await call('/v1/store-sheet', {
-      'publishableKey': publishableKey, 'url': url, 'platform': platform,
+      'publishableKey': publishableKey,
+      'url': url,
+      'platform': platform,
       if (deviceClass == 'phone' || deviceClass == 'tablet') 'deviceClass': deviceClass,
     });
     if (r.ok && r.json['ok'] == true) {
@@ -220,7 +226,8 @@ Future<StoreSheetResult> runStoreSheet({
     final referrer = android?['referrer'] is String ? android!['referrer'] as String : null;
     final pkg = options.androidPackage ?? android?['package'];
     if (!isPackageName(pkg)) {
-      return StoreSheetResult(false, 'none', clickId: clickId, linkId: linkId, referrer: referrer, reason: 'no_package');
+      return StoreSheetResult(false, 'none',
+          clickId: clickId, linkId: linkId, referrer: referrer, reason: 'no_package');
     }
     for (final i in androidStorePlan(pkg as String, referrer,
         callerId: options.callerId, inline: options.inline, listing: options.listing)) {

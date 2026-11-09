@@ -21,7 +21,10 @@ class Engine {
     if (r == 'offline') throw http.ClientException('offline');
     return http.Response(jsonEncode(r), req.url.path == '/v1/open' ? 202 : 200);
   });
-  List<Map<String, dynamic>> of(String path) => [for (final c in calls) if (c.$1 == path) c.$2];
+  List<Map<String, dynamic>> of(String path) => [
+        for (final c in calls)
+          if (c.$1 == path) c.$2
+      ];
 }
 
 class NoOpener extends StoreSheetOpener {
@@ -97,7 +100,9 @@ void main() {
   });
 
   test('store sheet sends it', () async {
-    final e = Engine({'/v1/store-sheet': {'ok': false, 'reason': 'not_found'}});
+    final e = Engine({
+      '/v1/store-sheet': {'ok': false, 'reason': 'not_found'}
+    });
     await links(e, () => 'tablet').openStoreSheet('https://links.test/promo', NoOpener());
     expect(e.of('/v1/store-sheet').single['deviceClass'], 'tablet');
   });

@@ -15,7 +15,7 @@ const t = 1800000000000;
 const device = DeviceFields(screenWidth: 411, pixelRatio: 2.625, language: 'en', timezone: 'Asia/Kolkata');
 const offline = 'offline';
 const priyaHash = '6bdb7e961d54ddc243ec721e6e211ac0a179b19a9ce2ad52a418198e146e69fe'; // sha256('priya@example.com')
-const phoneHash = '92b5072176e723878b5e06ff3ca61898e4eb74e8c46642a0f2db800b17364ab0'; // sha256('919876543210')
+const phoneHash = 'f3a47ce5ce3d4ca8ad15225a245b2759022f79489f5c62719b8c9490f7aab90e'; // sha256('+919876543210'), v15
 
 /// Fake engine: every call answers [route] (a status, or [offline] = no answer).
 class Engine {
@@ -81,8 +81,25 @@ void main() {
     test('hashes an email, lower-cased and trimmed', () {
       expect(userIdField(' Priya@Example.COM '), (userId: priyaHash, userIdHashed: true));
     });
-    test('hashes a phone number as its digits', () {
+    test('hashes a phone number as + and its digits (v15, shared-spec ADR 0010)', () {
       expect(userIdField('+91 98765-43210'), (userId: phoneHash, userIdHashed: true));
+      for (final p in [
+        '(+91) 98765 43210',
+        '0091 98765 43210',
+        '+91\u00A098765\u00A043210',
+        '\u202A+91 98765 43210\u202C',
+        '+91\u201398765\u201343210',
+        'tel:+91-98765-43210',
+        '\uFF0B\uFF19\uFF11 \uFF19\uFF18\uFF17\uFF16\uFF15 \uFF14\uFF13\uFF12\uFF11\uFF10'
+      ]) {
+        expect(userIdField(p), (userId: phoneHash, userIdHashed: true), reason: p);
+      }
+      expect(userIdField('\u096F\u096E\u096D\u096C\u096B\u096A\u0969\u0968\u0967\u0966'),
+          (userId: sha256Hex('9876543210'), userIdHashed: true));
+      expect(userIdField('Priya\uFF20Example.com'), (userId: sha256Hex('priya\uFF20example.com'), userIdHashed: true));
+      for (final id in ['98765+43210', '+91 98765 43210 ext 12', 'TEL:1234567', '98765_43210']) {
+        expect(userIdField(id), (userId: id, userIdHashed: false), reason: id);
+      }
     });
     test("trims JavaScript's whitespace set: U+FEFF and U+3000 go, U+0085 and U+200B stay", () {
       expect(userIdField('\uFEFF\u3000user_4821\u00A0'), (userId: 'user_4821', userIdHashed: false));

@@ -70,12 +70,24 @@ StraitLinks links(Engine e, String platform) => StraitLinks(
     );
 
 const androidReply = {
-  'ok': true, 'beta': true, 'clickId': click, 'linkId': 'lnk_42',
+  'ok': true,
+  'beta': true,
+  'clickId': click,
+  'linkId': 'lnk_42',
   'android': {'package': 'shoes.hilltop.app', 'referrer': referrer},
 };
 Map<String, Object> iosReply([Map<String, Object?> extra = const {}]) => {
-      'ok': true, 'beta': true, 'clickId': click, 'linkId': 'lnk_42',
-      'ios': {'appStoreId': '1234567890', 'campaignToken': 'autumn-sale', 'deviceMatching': true, 'handoffUrl': null, ...extra},
+      'ok': true,
+      'beta': true,
+      'clickId': click,
+      'linkId': 'lnk_42',
+      'ios': {
+        'appStoreId': '1234567890',
+        'campaignToken': 'autumn-sale',
+        'deviceMatching': true,
+        'handoffUrl': null,
+        ...extra
+      },
     };
 
 void main() {
@@ -114,8 +126,11 @@ void main() {
       expect(r.referrer, referrer);
       expect(r.clickId, click);
       expect(o.intents, hasLength(1));
-      expect(e.body('/v1/store-sheet'),
-          {'publishableKey': 'st_pub_test_appowner01', 'url': 'https://hilltop.strait.link/promo', 'platform': 'android'});
+      expect(e.body('/v1/store-sheet'), {
+        'publishableKey': 'st_pub_test_appowner01',
+        'url': 'https://hilltop.strait.link/promo',
+        'platform': 'android'
+      });
     });
 
     test('falls back to market when the inline sheet cannot start; throwing counts as not started', () async {
@@ -126,15 +141,19 @@ void main() {
     });
 
     test('offline with androidPackage: store opens, deep link not kept', () async {
-      final r = await links(Engine({}, offline: true), 'android').openStoreSheet(
-          'https://hilltop.strait.link/promo', SpyOpener(), const StoreSheetOptions(androidPackage: 'shoes.hilltop.app'));
+      final r = await links(Engine({}, offline: true), 'android').openStoreSheet('https://hilltop.strait.link/promo',
+          SpyOpener(), const StoreSheetOptions(androidPackage: 'shoes.hilltop.app'));
       expect(r.opened, isTrue);
       expect(r.referrer, isNull);
       expect(r.reason, 'offline');
     });
 
     test('unknown link, no package: nothing opens', () async {
-      final r = await links(Engine({'/v1/store-sheet': {'ok': false, 'reason': 'not_found'}}), 'android')
+      final r = await links(
+              Engine({
+                '/v1/store-sheet': {'ok': false, 'reason': 'not_found'}
+              }),
+              'android')
           .openStoreSheet('https://hilltop.strait.link/nope', SpyOpener());
       expect(r.opened, isFalse);
       expect(r.reason, 'no_package');
@@ -154,7 +173,9 @@ void main() {
     });
 
     test('device matching off: no match-save; overlay style', () async {
-      final e = Engine({'/v1/store-sheet': iosReply({'deviceMatching': false})});
+      final e = Engine({
+        '/v1/store-sheet': iosReply({'deviceMatching': false})
+      });
       final r = await links(e, 'ios').openStoreSheet(
           'https://hilltop.strait.link/promo', SpyOpener(), const StoreSheetOptions(style: StoreSheetStyle.overlay));
       expect(r.method, 'overlay');
@@ -163,7 +184,10 @@ void main() {
     });
 
     test('handoff link copied only when asked', () async {
-      final e = Engine({'/v1/store-sheet': iosReply({'handoffUrl': handoff}), '/v1/match-save': <String, Object>{}});
+      final e = Engine({
+        '/v1/store-sheet': iosReply({'handoffUrl': handoff}),
+        '/v1/match-save': <String, Object>{}
+      });
       final o = SpyOpener(canWrite: true);
       expect((await links(e, 'ios').openStoreSheet('https://hilltop.strait.link/promo', o)).handoffCopied, isFalse);
       final r = await links(e, 'ios')

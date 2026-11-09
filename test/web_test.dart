@@ -17,22 +17,14 @@ import 'package:test/test.dart';
 // reaches onLink for routing but is never reported (it is a page view).
 // Run: dart test -p chrome  (and -c dart2wasm)
 
-const device = DeviceFields(
-    screenWidth: 390, pixelRatio: 3, language: 'en', timezone: 'Asia/Kolkata');
+const device = DeviceFields(screenWidth: 390, pixelRatio: 3, language: 'en', timezone: 'Asia/Kolkata');
 
-({
-  StraitLinks strait,
-  List<(String, Map<String, dynamic>?)> calls,
-  MemoryStore store
-}) make([http.Response Function(String path)? reply]) {
+({StraitLinks strait, List<(String, Map<String, dynamic>?)> calls, MemoryStore store}) make(
+    [http.Response Function(String path)? reply]) {
   final calls = <(String, Map<String, dynamic>?)>[];
   final client = MockClient((req) async {
-    calls.add((
-      req.url.path,
-      req.body.isEmpty ? null : jsonDecode(req.body) as Map<String, dynamic>
-    ));
-    return reply?.call(req.url.path) ??
-        http.Response(jsonEncode({'ok': true, 'matched': false}), 200);
+    calls.add((req.url.path, req.body.isEmpty ? null : jsonDecode(req.body) as Map<String, dynamic>));
+    return reply?.call(req.url.path) ?? http.Response(jsonEncode({'ok': true, 'matched': false}), 200);
   });
   final store = MemoryStore();
   final strait = StraitLinks(
@@ -50,8 +42,7 @@ const device = DeviceFields(
 Future<void> settle() => Future<void>.delayed(const Duration(milliseconds: 20));
 
 void main() {
-  test('first visit: no deferred check, nothing recorded as an install',
-      () async {
+  test('first visit: no deferred check, nothing recorded as an install', () async {
     final h = make();
     final events = <LinkEvent>[];
     h.strait.onLink.listen(events.add);
@@ -64,15 +55,11 @@ void main() {
 
   const tap = '3f2a9c1e-7b4d-4e8a-9c0f-1a2b3c4d5e6f';
 
-  test(
-      'a landing from a Strait tap is reported once as a web open joined to the tap',
-      () async {
+  test('a landing from a Strait tap is reported once as a web open joined to the tap', () async {
     final h = make();
     final events = <LinkEvent>[];
     h.strait.onLink.listen(events.add);
-    await h.strait.start(
-        initialUrl:
-            'https://shop.example.com/p/42?color=red&strait_click=${tap.toUpperCase()}');
+    await h.strait.start(initialUrl: 'https://shop.example.com/p/42?color=red&strait_click=${tap.toUpperCase()}');
     await h.strait.flushOpenReports();
     await settle();
     expect(events.single.matched, isTrue);
@@ -100,9 +87,7 @@ void main() {
     expect(h.calls.lastWhere((c) => c.$1 == '/v1/event').$2!['clickId'], tap);
   });
 
-  test(
-      'a reload of the landing sends the same openId (the engine de-duplicates it)',
-      () async {
+  test('a reload of the landing sends the same openId (the engine de-duplicates it)', () async {
     const landing = 'https://shop.example.com/p/42?strait_click=$tap';
     final first = make();
     await first.strait.start(initialUrl: landing);
@@ -112,15 +97,11 @@ void main() {
     await reload.strait.start(initialUrl: landing);
     await reload.strait.flushOpenReports();
     await settle();
-    final ids = [
-      first,
-      reload
-    ].map((h) => h.calls.singleWhere((c) => c.$1 == '/v1/open').$2!['openId']);
+    final ids = [first, reload].map((h) => h.calls.singleWhere((c) => c.$1 == '/v1/open').$2!['openId']);
     expect(ids, ['web-$tap', 'web-$tap']);
   });
 
-  test('a page URL without a Strait tap id is routed but never reported',
-      () async {
+  test('a page URL without a Strait tap id is routed but never reported', () async {
     for (final url in [
       'https://shop.example.com/',
       'https://shop.example.com/p/42?color=red',
@@ -156,32 +137,23 @@ void main() {
 
   // F2: the engine counts a /v1/resolve without an openId as a tap (older SDKs), so the web asks
   // /v1/lookup, which records nothing: key + host + path only, no open report.
-  test('a short link handed in on the web is looked up through /v1/lookup and not counted',
-      () async {
+  test('a short link handed in on the web is looked up through /v1/lookup and not counted', () async {
     final h = make((path) => path == '/v1/lookup'
         ? http.Response(
-            jsonEncode({
-              'matched': true,
-              'longUrl': 'https://shop.example.com/p/8?c=red',
-              'linkId': 'lnk_8'
-            }),
-            200)
+            jsonEncode({'matched': true, 'longUrl': 'https://shop.example.com/p/8?c=red', 'linkId': 'lnk_8'}), 200)
         : http.Response('{}', 202));
-    final e = await h.strait.handleUrl(
-        'https://acme.strait.link/summer?utm_source=sms&x=1');
+    final e = await h.strait.handleUrl('https://acme.strait.link/summer?utm_source=sms&x=1');
     await h.strait.flushOpenReports();
     await settle();
     expect(e.matched, isTrue);
     expect(e.path, '/p/8');
     expect(e.linkId, 'lnk_8');
     expect(h.calls.map((c) => c.$1), ['/v1/lookup']);
-    expect(h.calls.single.$2,
-        {'publishableKey': 'st_pub_test_web', 'url': 'https://acme.strait.link/summer'});
+    expect(h.calls.single.$2, {'publishableKey': 'st_pub_test_web', 'url': 'https://acme.strait.link/summer'});
     expect(await h.strait.pendingOpenReports(), 0);
   });
 
-  test('a web lookup that gets no answer is reason network, nothing queued',
-      () async {
+  test('a web lookup that gets no answer is reason network, nothing queued', () async {
     final h = make((_) => throw http.ClientException('offline'));
     final e = await h.strait.handleUrl('https://acme.strait.link/summer');
     await settle();

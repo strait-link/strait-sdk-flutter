@@ -18,8 +18,7 @@ const endpoint = 'https://links.test';
 const click = '3f2a9c1e-7b4d-4e8a-9c0f-1a2b3c4d5e6f';
 const hour = 3600000;
 final openIdRe = RegExp(r'^o_[a-z0-9]+_[a-z0-9]{12}$');
-const device = DeviceFields(
-    screenWidth: 411, pixelRatio: 2.625, language: 'en', timezone: 'Asia/Kolkata');
+const device = DeviceFields(screenWidth: 411, pixelRatio: 2.625, language: 'en', timezone: 'Asia/Kolkata');
 
 /// An engine answer: status + JSON body (+ headers), or [offline] (no answer) / [hang].
 class Reply {
@@ -45,8 +44,7 @@ class FakeEngine {
   FakeEngine(this.routes);
 
   late final http.Client client = MockClient((req) async {
-    calls.add(Call(req.url.path,
-        req.body.isEmpty ? null : jsonDecode(req.body) as Map<String, dynamic>));
+    calls.add(Call(req.url.path, req.body.isEmpty ? null : jsonDecode(req.body) as Map<String, dynamic>));
     final r = routes[req.url.path] ?? const Reply(404, {'error': 'not found'});
     if (r == offline) throw http.ClientException('Network request failed');
     if (r == hang) return Completer<http.Response>().future;
@@ -80,8 +78,7 @@ class Harness {
   }
 
   Future<void> start({String? initialUrl}) async {
-    await strait.start(
-        initialUrl: initialUrl, urls: phone.urls.stream, lifecycle: phone.states.stream);
+    await strait.start(initialUrl: initialUrl, urls: phone.urls.stream, lifecycle: phone.states.stream);
     await Future<void>.delayed(Duration.zero); // deliver replayed events
   }
 }
@@ -204,8 +201,7 @@ void main() {
       expect(engine.of('/v1/open'), isEmpty);
     });
 
-    test('engine answered but could not record → retried via /v1/open with the same openId',
-        () async {
+    test('engine answered but could not record → retried via /v1/open with the same openId', () async {
       final engine = FakeEngine({
         '/v1/resolve': Reply(200, {...resolvedBody}..['recorded'] = false),
         '/v1/open': accepted,
@@ -222,8 +218,7 @@ void main() {
       expect(body['linkId'], 'lnk_42');
     });
 
-    test('offline: saved, then sent (same openId) when the app comes back with network',
-        () async {
+    test('offline: saved, then sent (same openId) when the app comes back with network', () async {
       final phone = FakePhone();
       final engine = FakeEngine({'/v1/resolve': offline, '/v1/open': offline});
       final h = make(phone, engine, returning());
@@ -239,8 +234,7 @@ void main() {
       phone.advance(10000);
       phone.setState(AppLifecycle.active);
       await settle();
-      final sent =
-          engine.of('/v1/open').where((c) => c.body!['openId'] == h.events.last.id).toList();
+      final sent = engine.of('/v1/open').where((c) => c.body!['openId'] == h.events.last.id).toList();
       final body = sent.last.body!;
       expect(body['route'], 'app_link');
       expect(body['url'], 'https://links.test/sale');
@@ -333,7 +327,8 @@ void main() {
       expect(engine.of('/v1/open'), hasLength(4));
     });
 
-    test('without Retry-After backs off exponentially with jitter (15-30 s, then 30-60 s); an answer resets it', () async {
+    test('without Retry-After backs off exponentially with jitter (15-30 s, then 30-60 s); an answer resets it',
+        () async {
       final phone = FakePhone();
       final engine = FakeEngine({});
       final h = make(phone, engine, returning(), () => 0); // the shortest jitter: half the step
@@ -407,11 +402,7 @@ void main() {
       await settle();
       expect(await h.strait.pendingOpenReports(), 0);
       expect(
-          engine
-              .of('/v1/open')
-              .where((c) => c.body!['url'] == 'https://a.b/old')
-              .map((c) => c.body!['openId'])
-              .toSet(),
+          engine.of('/v1/open').where((c) => c.body!['url'] == 'https://a.b/old').map((c) => c.body!['openId']).toSet(),
           hasLength(1));
     });
 
@@ -430,7 +421,8 @@ void main() {
   group('B18: no query or fragment leaves the device or reaches storage', () {
     const tapKey = 'strait.lastTap';
     const day = 24 * 3600 * 1000;
-    test('the /v1/open report keeps only host, path and utm_source; the app still gets the full URL', testOn: 'vm', () async {
+    test('the /v1/open report keeps only host, path and utm_source; the app still gets the full URL', testOn: 'vm',
+        () async {
       final phone = FakePhone();
       final engine = FakeEngine({'/v1/open': accepted});
       final h = make(phone, engine, returning());
@@ -460,9 +452,15 @@ void main() {
       final storage = returning();
       storage.data['strait.pendingOpens'] = jsonEncode([
         {
-          'openId': 'o_old_aaaaaaaaaaaa', 'kind': 'direct', 'route': 'app_link', 'appState': 'closed',
-          'platform': 'android', 'url': 'https://shop.example/p?token=abc#x', 'matched': true,
-          'firstLaunch': false, 'at': 1800000000000 - 1000,
+          'openId': 'o_old_aaaaaaaaaaaa',
+          'kind': 'direct',
+          'route': 'app_link',
+          'appState': 'closed',
+          'platform': 'android',
+          'url': 'https://shop.example/p?token=abc#x',
+          'matched': true,
+          'firstLaunch': false,
+          'at': 1800000000000 - 1000,
         }
       ]);
       final h = make(phone, engine, storage);
@@ -511,8 +509,7 @@ void main() {
 
   // Install paths: VM only (web builds have no install, see test/web_test.dart).
   group('first launch and the deferred check (B6/B7 revised)', testOn: 'vm', () {
-    test('first launch opened by a link: no deferred check, and the open counts as the install',
-        () async {
+    test('first launch opened by a link: no deferred check, and the open counts as the install', () async {
       final engine = FakeEngine({'/v1/resolve': resolved});
       final h = make(FakePhone(), engine);
       await h.start(initialUrl: 'https://links.test/sale');
@@ -531,9 +528,7 @@ void main() {
           'matchMethod': 'install_referrer',
         })
       });
-      final h = make(
-          FakePhone(referrer: 'utm_source=google-play&strait_link=lnk_42&strait_click=$click'),
-          engine);
+      final h = make(FakePhone(referrer: 'utm_source=google-play&strait_link=lnk_42&strait_click=$click'), engine);
       await h.start();
       expect(engine.of('/v1/referrer')[0].body, {
         'publishableKey': pk,
@@ -601,11 +596,9 @@ void main() {
       expect(engine.of('/v1/match')[0].body!['record'], false);
     });
 
-    test('the debug re-check sends record:false on /v1/referrer too; the first-launch check never does',
-        () async {
+    test('the debug re-check sends record:false on /v1/referrer too; the first-launch check never does', () async {
       final engine = FakeEngine({
-        '/v1/referrer': const Reply(
-            200, {'matched': true, 'longUrl': 'https://shop.example/p/42', 'linkId': 'lnk_42'})
+        '/v1/referrer': const Reply(200, {'matched': true, 'longUrl': 'https://shop.example/p/42', 'linkId': 'lnk_42'})
       });
       final h = make(FakePhone(referrer: 'strait_link=lnk_42'), engine);
       await h.start();
@@ -618,8 +611,7 @@ void main() {
       expect(calls[1].body!.containsKey('openId'), isFalse);
     });
 
-    test('a request the engine never answers times out after 10 s and counts as network',
-        () async {
+    test('a request the engine never answers times out after 10 s and counts as network', () async {
       // Fire the SDK's 10 s timer at once (and note it) instead of waiting 10 real seconds.
       final timers = <Duration>[];
       final spec = ZoneSpecification(createTimer: (self, parent, zone, d, f) {
@@ -634,8 +626,7 @@ void main() {
       expect(storage.data['strait.deferredChecked'], isNull);
     });
 
-    test('unreadable storage = already checked (no deferred jump); write failures never throw',
-        () async {
+    test('unreadable storage = already checked (no deferred jump); write failures never throw', () async {
       StraitLinks strait(FakeEngine engine, KeyValueStore store) => StraitLinks(
             publishableKey: pk,
             endpoint: endpoint,
@@ -651,8 +642,7 @@ void main() {
       final e2 = FakeEngine({'/v1/match': noMatch});
       await expectLater(strait(e2, BrokenStore()).start(), completes);
       final e3 = FakeEngine({'/v1/resolve': resolved});
-      await expectLater(
-          strait(e3, BrokenStore()).start(initialUrl: 'https://links.test/sale'), completes);
+      await expectLater(strait(e3, BrokenStore()).start(initialUrl: 'https://links.test/sale'), completes);
     });
   });
 

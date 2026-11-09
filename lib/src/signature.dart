@@ -92,8 +92,7 @@ Signature computeSignature(SignatureInputs input) {
   final screenWidth = input.screenWidth.round();
   final pixelRatio = input.pixelRatio;
   final rawLang = input.language.isEmpty ? 'en' : input.language;
-  final language =
-      (rawLang.length <= 2 ? rawLang : rawLang.substring(0, 2)).toLowerCase();
+  final language = (rawLang.length <= 2 ? rawLang : rawLang.substring(0, 2)).toLowerCase();
   final ip = input.ip;
 
   final coreFields = [
