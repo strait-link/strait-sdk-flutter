@@ -92,7 +92,7 @@ void main() {
       'matched': true,
       'firstLaunch': false,
       'at': opens.single.$2!['at'],
-      'sdkVersion': straitSdkVersion,
+      'sdkVersion': 'flutter/$straitSdkVersion',
     });
     expect('web-$tap'.length, 40);
     // Events after the landing are attributed to the tap, like app opens.

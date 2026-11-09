@@ -56,7 +56,7 @@ Future<void> settle() async {
 }
 
 Matcher carriesVersions() =>
-    allOf(containsPair('appVersion', '4.12.0 (812)'), containsPair('sdkVersion', straitSdkVersion));
+    allOf(containsPair('appVersion', '4.12.0 (812)'), containsPair('sdkVersion', 'flutter/$straitSdkVersion'));
 Matcher noVersions() => isNot(anyOf(contains('appVersion'), contains('sdkVersion')));
 
 void main() {
@@ -183,7 +183,7 @@ void main() {
       for (final v in [null, '', '   ', '4.1é', '4.1\u0000']) {
         final body = await sent(v);
         expect(body, isNot(contains('appVersion')), reason: '$v');
-        expect(body, containsPair('sdkVersion', straitSdkVersion));
+        expect(body, containsPair('sdkVersion', 'flutter/$straitSdkVersion'));
       }
     });
   });

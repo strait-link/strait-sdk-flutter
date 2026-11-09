@@ -296,9 +296,9 @@ List<Map<String, dynamic>> pruneOpenQueue(List<Map<String, dynamic>> queue, int 
   return fresh.length > openQueueMax ? fresh.sublist(fresh.length - openQueueMax) : fresh;
 }
 
-/// This SDK's version, sent as `sdkVersion` with every open and install report
-/// (td2-23). Kept equal to pubspec.yaml's `version` by a test.
-const String straitSdkVersion = '0.10.4';
+/// This SDK's version, sent as `sdkVersion` = `flutter/<it>` with every open and install report
+/// (td2-23, B25). Kept equal to pubspec.yaml's `version` by a test.
+const String straitSdkVersion = '0.10.5';
 
 /// `appVersion` + `sdkVersion` for a call that records an open or install (td2-23). The engine
 /// keeps 1-64 printable ASCII and drops anything else; the app version gets the same rule here:
@@ -308,7 +308,8 @@ Map<String, String> versionFields(String? appVersion) {
   if (v.length > 64) v = v.substring(0, 64).trimRight();
   return {
     if (v.isNotEmpty && RegExp(r'^[\x20-\x7E]+$').hasMatch(v)) 'appVersion': v,
-    'sdkVersion': straitSdkVersion,
+    // B25 (shared-spec ADR 0007): the SDK names itself, so the engine can tell it from Android/Swift with the same number.
+    'sdkVersion': 'flutter/$straitSdkVersion',
   };
 }
 
