@@ -49,7 +49,22 @@ class Engine {
   List<String> get matchHosts => calls.where((c) => c.path == '/v1/match').map((c) => c.host).toList();
 }
 
-StraitLinks make(Engine e) => StraitLinks(
+class Clip implements StraitClipboard {
+  int touched = 0;
+  @override
+  Future<bool> hasProbableWebUrl() async {
+    touched++;
+    return true;
+  }
+
+  @override
+  Future<String?> readText() async {
+    touched++;
+    return 'https://hilltop.links.test/h/AbCdEfGhIjKlMnOpQrStUv';
+  }
+}
+
+StraitLinks make(Engine e, {StraitClipboard? clip}) => StraitLinks(
       publishableKey: pk,
       endpoint: endpoint,
       platform: 'ios',
@@ -57,6 +72,7 @@ StraitLinks make(Engine e) => StraitLinks(
       storage: MemoryStore(),
       client: e.client,
       now: () => 1000000,
+      clipboard: clip,
     );
 
 void main() {
@@ -107,6 +123,20 @@ void main() {
     };
     await s.start();
     expect(e.matchHosts.where((h) => h == 'v4.straitlink.test'), isEmpty);
+  });
+
+  test('paste handoff (B19) follows the first answer: still runs when the IPv4 ask misses, never when it matches', () async {
+    final pasteMiss = {...missV6}..['ios'] = {'deviceMatching': true, 'pasteHandoff': true};
+    const claimOk = {'matched': true, 'longUrl': 'https://shop.example/x', 'linkId': 'lnk_1', 'matchMethod': 'clipboard'};
+    for (final (second, expectClaim) in [(<String, Object>{'matched': false}, true), (hitV4, false)]) {
+      final clip = Clip();
+      final e = Engine({'hilltop.links.test/v1/match': pasteMiss, 'v4.straitlink.test/v1/match': second, 'hilltop.links.test/v1/handoff/claim': claimOk});
+      final s = make(e, clip: clip);
+      await s.start();
+      expect(e.calls.any((c) => c.path == '/v1/handoff/claim'), expectClaim);
+      expect(clip.touched > 0, expectClaim);
+      expect(s.events.single.route, expectClaim ? LinkRoute.clipboard : LinkRoute.fingerprint);
+    }
   });
 
   test('ipv4MatchUrl accepts only a plain https …/v1/match URL', () {

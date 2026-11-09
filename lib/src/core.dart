@@ -504,11 +504,6 @@ final _handoffToken = RegExp(r'^[A-Za-z0-9_-]{22}$');
 final _handoffUrl =
     RegExp(r'^([A-Za-z][A-Za-z0-9+.-]*)://([^/?#\s]+)/h/([^/?#\s]*)/?(?:[?#]\S*)?$');
 
-/// Whether a `/v1/match` reply says to try the paste handoff (contract B19):
-/// the workspace's live choice in Dashboard Settings -> iPhone installs,
-/// `reply.ios.pasteHandoff`. Only an unmatched reply counts, and a missing
-/// field (an older engine) means off. Read on every check, never stored, so a
-/// dashboard change applies without an app release.
 /// The engine's IPv4-only match URL in an unmatched first-launch `/v1/match` reply (contract B24,
 /// engine ADR 0101), or null. Only an https URL whose path is exactly `/v1/match` (no query, no
 /// fragment, no credentials).
@@ -521,6 +516,11 @@ String? ipv4MatchUrl(Object? value) {
   return value;
 }
 
+/// Whether a `/v1/match` reply says to try the paste handoff (contract B19):
+/// the workspace's live choice in Dashboard Settings -> iPhone installs,
+/// `reply.ios.pasteHandoff`. Only an unmatched reply counts, and a missing
+/// field (an older engine) means off. Read on every check, never stored, so a
+/// dashboard change applies without an app release.
 bool pasteHandoffOn(Object? reply) {
   if (reply is! Map) return false;
   if (reply['matched'] == true) return false;
