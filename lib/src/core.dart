@@ -563,14 +563,29 @@ final _phone = RegExp(r'^\+?[0-9 ().-]+$');
 final _nonDigit = RegExp(r'\D');
 final _control = RegExp(r'[\x00-\x1f\x7f]');
 
+/// [s] trimmed with JavaScript's `String.prototype.trim` set (contract B27): Dart's own trim also strips U+0085.
+String _jsTrim(String s) {
+  bool ws(int c) =>
+      (c >= 0x09 && c <= 0x0d) || c == 0x20 || c == 0xa0 || c == 0x1680 || (c >= 0x2000 && c <= 0x200a) ||
+      c == 0x2028 || c == 0x2029 || c == 0x202f || c == 0x205f || c == 0x3000 || c == 0xfeff;
+  var a = 0, b = s.length;
+  while (a < b && ws(s.codeUnitAt(a))) {
+    a++;
+  }
+  while (b > a && ws(s.codeUnitAt(b - 1))) {
+    b--;
+  }
+  return s.substring(a, b);
+}
+
 /// B27 (shared-spec ADR 0009): what `setUserId(id)` sends with later events, or null (nothing sent).
-/// Trimmed; empty, longer than [userIdMax] UTF-16 units or holding a control character = null. An email
-/// (any `@`) is sent as the SHA-256 hex of its lower-case form, a phone number (only digits, spaces,
+/// In this order: trimmed (JavaScript's whitespace set); empty or longer than [userIdMax] UTF-16 units =
+/// null; an email (any `@`) is sent as the SHA-256 hex of its lower-case form, a phone number (only digits, spaces,
 /// `+ ( ) . -`, with 8-15 digits) as the SHA-256 hex of its digits: `userIdHashed: true`, the raw value
-/// never leaves the device.
+/// never leaves the device; holding a control character = null; else the trimmed id.
 ({String userId, bool userIdHashed})? userIdField(String? id) {
   if (id == null) return null;
-  final t = id.trim();
+  final t = _jsTrim(id);
   if (t.isEmpty || t.length > userIdMax) return null;
   if (t.contains('@')) return (userId: sha256Hex(t.toLowerCase()), userIdHashed: true);
   final digits = t.replaceAll(_nonDigit, '');

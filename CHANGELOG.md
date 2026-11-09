@@ -6,7 +6,9 @@
   Later `trackEvent` calls carry the id to your `app.event` webhook (`userId`, `userIdHashed`), so you can join Strait
   events to your own users and see which campaigns bring paying ones. Emails and phone numbers are hashed on the phone
   (SHA-256, no new dependency) and never leave it raw. Memory only, never logged, cleared and not sent while switched
-  off. Conformance vectors v13 (`userId` group).
+  off. The id is read when `trackEvent` is called; an event saved offline keeps it on the device until sent (up to 7
+  days, deleted on opt-out). Trimmed with JavaScript's whitespace set, like every Strait SDK. Conformance vectors v14
+  (`userId` group).
 
 ## 0.10.6 (9 Nov 2026)
 

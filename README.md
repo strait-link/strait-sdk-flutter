@@ -265,7 +265,8 @@ strait.setUserId(null);      // on sign-out
 Later `trackEvent` calls carry this id to your `app.event` webhook (`userId`, `userIdHashed`), so you can
 join Strait's tap, link and campaign to your own users and see which campaigns bring paying ones
 (contract B27). It is kept in memory only, never logged, ignored while `setEnabled(false)` (which also
-clears it), and not sent with app opens or installs. An event saved offline keeps the id it was tracked with.
+clears it), and not sent with app opens or installs. The id is read when you call `trackEvent`; an event saved
+offline keeps that id on the device until it is sent (up to 7 days; deleted on opt-out).
 
 Emails and phone numbers never leave the phone: an id with `@` is sent as the SHA-256 hex of its
 lower-cased form, one made only of digits, spaces and `+ ( ) . -` with 8-15 digits as the SHA-256 hex of
@@ -477,7 +478,7 @@ taps are deleted, `staleTap`) · B19 (iPhone paste handoff, chosen in the dashbo
 `parseHandoffUrl`, `/v1/handoff/claim`, `claimHandoff`) · B22 (old Firebase
 page.link links: short → `/v1/resolve`, long → `link=` read on the device) · B23
 (`doctor()` setup check, `doctorFindings`) · B27 (`setUserId`, `userIdField`). Both
-shared vector files (conformance v13) are asserted in `dart test`.
+shared vector files (conformance v14) are asserted in `dart test`.
 
 ## iPhone deferred links (opt-in): you choose the method (B19)
 

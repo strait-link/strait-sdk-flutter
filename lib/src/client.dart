@@ -385,7 +385,7 @@ class StraitLinks {
     // The switch not read yet (setUserId before start): drop it if the stored switch says off.
     if (field != null && _enabled == null) {
       unawaited(isEnabled().then((on) {
-        if (!on && identical(_userId, field)) _userId = null;
+        if (!on && _userId == field) _userId = null;
       }));
     }
   }
@@ -917,6 +917,7 @@ class StraitLinks {
   /// kept and sent later with the open reports (contract B13a).
   Future<bool> trackEvent(String name,
       {num? value, String? currency, String? linkId, String? clickId, String? eventId}) async {
+    final user = _userId; // B27: read now, before any await, so a setUserId right after this call can't change it
     if (!await isEnabled()) return false;
     try {
       await _tapWrite;
@@ -927,7 +928,6 @@ class StraitLinks {
       final at = _now();
       if (staleTap(stored, at)) _dropStaleTap(at);
       final tap = eventClickId(stored, at, clickId);
-      final user = _userId; // B27: the id now goes with this event, even when it is sent later
       // B13a: built once (tap id chosen now), with an eventId so a retry is
       // stored once. Saved for retry without the publishable key.
       final status = await _report({
@@ -940,7 +940,7 @@ class StraitLinks {
         if (currency != null) 'currency': currency,
         if (linkId != null) 'linkId': linkId,
         if (tap != null) 'clickId': tap,
-        if (user != null) ...{'userId': user.userId, 'userIdHashed': user.userIdHashed},
+        if (user != null && _enabled != false) ...{'userId': user.userId, 'userIdHashed': user.userIdHashed},
       });
       return status != null && status >= 200 && status < 300;
     } catch (_) {

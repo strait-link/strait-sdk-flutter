@@ -26,8 +26,8 @@ void main() async {
     ]));
   });
 
-  test('vectors v13', () {
-    expect(v['version'], 13);
+  test('vectors v14', () {
+    expect(v['version'], 14);
   });
 
   group('userId (B27)', () {

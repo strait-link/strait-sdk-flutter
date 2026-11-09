@@ -84,6 +84,11 @@ void main() {
     test('hashes a phone number as its digits', () {
       expect(userIdField('+91 98765-43210'), (userId: phoneHash, userIdHashed: true));
     });
+    test("trims JavaScript's whitespace set: U+FEFF and U+3000 go, U+0085 and U+200B stay", () {
+      expect(userIdField('\uFEFF\u3000user_4821\u00A0'), (userId: 'user_4821', userIdHashed: false));
+      expect(userIdField('\u0085user_4821'), (userId: '\u0085user_4821', userIdHashed: false));
+      expect(userIdField('user_4821\u200B'), (userId: 'user_4821\u200B', userIdHashed: false));
+    });
     test('drops empty, too long, control characters and null', () {
       for (final bad in [null, '', '   ', 'x' * (userIdMax + 1), 'a\nb']) {
         expect(userIdField(bad), isNull);
@@ -132,6 +137,19 @@ void main() {
       await links.flushOpenReports();
       expect(e.events.last, containsPair('eventId', 'ord_1'));
       expect(e.events.last, containsPair('userId', 'user_1'));
+    });
+
+    test('the id is read when trackEvent is called: a setUserId right after it never changes that event', () async {
+      final (links, e, _) = await started();
+      links.setUserId('user_1');
+      final a = links.trackEvent('purchase', eventId: 'ord_1');
+      links.setUserId(null);
+      final b = links.trackEvent('refund_ask', eventId: 'ord_2');
+      links.setUserId('user_2');
+      await Future.wait([a, b]);
+      final byId = {for (final ev in e.events) ev['eventId']: ev};
+      expect(byId['ord_1'], containsPair('userId', 'user_1'));
+      expect(byId['ord_2']!.containsKey('userId'), isFalse);
     });
 
     test('opting out clears it; setUserId while off is ignored; back on sends nothing until set again', () async {
