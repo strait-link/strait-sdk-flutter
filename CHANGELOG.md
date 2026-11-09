@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10.4 (9 Nov 2026)
+
+- README: Android release builds need `<uses-permission android:name="android.permission.INTERNET"/>` in
+  `android/app/src/main/AndroidManifest.xml`. `flutter create` adds it only to the debug and profile manifests, so a release
+  build could not reach Strait. Now in Install and the quick start. No code change.
+
 ## 0.10.3 (9 Nov 2026)
 
 - iPhone install matching across IPv4 / IPv6 (contract B24, engine ADR 0101): when Safari tapped the link over IPv4
