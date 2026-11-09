@@ -187,6 +187,9 @@ class StraitLinks {
   /// Opt-out switch, read from storage once; unreadable storage = the default (on), like every other read here.
   bool? _enabled;
 
+  /// B27: the [setUserId] value, in memory only and already hashed when it was an email or phone.
+  ({String userId, bool userIdHashed})? _userId;
+
   /// The first-launch check was skipped because the SDK was off: [setEnabled] true runs it.
   bool _deferredDue = false;
 
@@ -340,6 +343,7 @@ class StraitLinks {
   /// check skipped while off runs now. Never throws.
   Future<void> setEnabled(bool enabled) async {
     _enabled = enabled;
+    if (!enabled) _userId = null;
     try {
       await _storage.set(_enabledKey, enabled ? '1' : '0');
     } catch (_) {}
@@ -367,6 +371,23 @@ class StraitLinks {
       _enabled ??= v != '0'; // a setEnabled() during the read wins
     }
     return _enabled!;
+  }
+
+  /// Your own user id, after your sign-in (contract B27): later [trackEvent] calls carry it to your
+  /// app.event webhook (`userId`, `userIdHashed`), so you can join Strait events to your users. An email
+  /// or phone number is hashed here (SHA-256, `userIdHashed: true`) and never leaves the device; an empty,
+  /// over-128-character or control-character id is not sent and clears the previous one. Kept in memory
+  /// only: call it again when the app starts with a user already signed in, and `setUserId(null)` on
+  /// sign-out. Ignored while switched off ([setEnabled] false also clears it). Never logged.
+  void setUserId(String? id) {
+    final field = _enabled == false ? null : userIdField(id);
+    _userId = field;
+    // The switch not read yet (setUserId before start): drop it if the stored switch says off.
+    if (field != null && _enabled == null) {
+      unawaited(isEnabled().then((on) {
+        if (!on && _userId == field) _userId = null;
+      }));
+    }
   }
 
   Future<void> _setFlag() => _write(_deferredFlag, '1');
@@ -896,6 +917,7 @@ class StraitLinks {
   /// kept and sent later with the open reports (contract B13a).
   Future<bool> trackEvent(String name,
       {num? value, String? currency, String? linkId, String? clickId, String? eventId}) async {
+    final user = _userId; // B27: read now, before any await, so a setUserId right after this call can't change it
     if (!await isEnabled()) return false;
     try {
       await _tapWrite;
@@ -918,6 +940,7 @@ class StraitLinks {
         if (currency != null) 'currency': currency,
         if (linkId != null) 'linkId': linkId,
         if (tap != null) 'clickId': tap,
+        if (user != null && _enabled != false) ...{'userId': user.userId, 'userIdHashed': user.userIdHashed},
       });
       return status != null && status >= 200 && status < 300;
     } catch (_) {
