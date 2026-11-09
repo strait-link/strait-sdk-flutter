@@ -61,6 +61,9 @@ await links.start(
 The full `PrefsStore`, `LifecycleFeed` and `deviceFields` code is in the docs. Pass the IANA time zone
 (`Asia/Kolkata`) from `flutter_timezone`, never `DateTime.timeZoneName`.
 
+- Conversions: `links.trackEvent('purchase', value: 499, currency: 'INR')` attaches the tap id automatically.
+- Your user: `links.setUserId(user.id)` after sign-in, `links.setUserId(null)` on sign-out; later events carry it to the `app.event` webhook (emails and phone numbers are hashed on the device, contract B27).
+
 ## Verify
 
 Run these; don't assume. Steps 1 to 3 need no phone, so run them in a loop after every config change

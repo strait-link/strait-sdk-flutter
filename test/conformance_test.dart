@@ -19,14 +19,25 @@ void main() async {
     expect(openQueueMaxAgeMs, c['OPEN_QUEUE_MAX_AGE_MS']);
     expect(attributionWindowMs, c['ATTRIBUTION_WINDOW_MS']);
     expect(installReferrerMax, c['INSTALL_REFERRER_MAX']);
+    expect(userIdMax, c['USER_ID_MAX']);
     expect(c.keys, unorderedEquals([
       'RESUME_WINDOW_MS', 'TRANSIENT_PAUSE_MS', 'OPEN_QUEUE_MAX', 'OPEN_QUEUE_MAX_AGE_MS',
-      'ATTRIBUTION_WINDOW_MS', 'INSTALL_REFERRER_MAX'
+      'ATTRIBUTION_WINDOW_MS', 'INSTALL_REFERRER_MAX', 'USER_ID_MAX'
     ]));
   });
 
-  test('vectors v12', () {
-    expect(v['version'], 12);
+  test('vectors v13', () {
+    expect(v['version'], 13);
+  });
+
+  group('userId (B27)', () {
+    for (final c in v['userId'] as List) {
+      test('${c['name']}', () {
+        final e = c['expected'] as Map<String, dynamic>?;
+        expect(userIdField(c['input'] as String?),
+            e == null ? isNull : (userId: e['userId'] as String, userIdHashed: e['userIdHashed'] as bool));
+      });
+    }
   });
 
   group('installReferrer (B26)', () {

@@ -3,7 +3,7 @@
 /// cross-language contract (see `shared-spec/SDK-CONTRACT.md`).
 library;
 
-import 'dart:convert' show jsonDecode, jsonEncode;
+import 'dart:convert' show jsonDecode, jsonEncode, utf8;
 import 'dart:math' show Random, max, min;
 
 /// How the app received a link.
@@ -298,7 +298,7 @@ List<Map<String, dynamic>> pruneOpenQueue(List<Map<String, dynamic>> queue, int 
 
 /// This SDK's version, sent as `sdkVersion` = `flutter/<it>` with every open and install report
 /// (td2-23, B25). Kept equal to pubspec.yaml's `version` by a test.
-const String straitSdkVersion = '0.10.6';
+const String straitSdkVersion = '0.10.7';
 
 /// The longest Play install referrer the engine reads (engine ADR 0106); a longer one is not sent.
 const int installReferrerMax = 4096;
@@ -554,4 +554,88 @@ String? parseHandoffUrl(String? text, List<String> linkHosts) {
   if (!linkHosts.any((h) => h.toLowerCase() == host)) return null;
   final token = m.group(3)!;
   return _handoffToken.hasMatch(token) ? token : null;
+}
+
+/// The longest user id the SDK sends (after trimming); a longer one is not sent (engine ADR 0110).
+const int userIdMax = 128;
+
+final _phone = RegExp(r'^\+?[0-9 ().-]+$');
+final _nonDigit = RegExp(r'\D');
+final _control = RegExp(r'[\x00-\x1f\x7f]');
+
+/// B27 (shared-spec ADR 0009): what `setUserId(id)` sends with later events, or null (nothing sent).
+/// Trimmed; empty, longer than [userIdMax] UTF-16 units or holding a control character = null. An email
+/// (any `@`) is sent as the SHA-256 hex of its lower-case form, a phone number (only digits, spaces,
+/// `+ ( ) . -`, with 8-15 digits) as the SHA-256 hex of its digits: `userIdHashed: true`, the raw value
+/// never leaves the device.
+({String userId, bool userIdHashed})? userIdField(String? id) {
+  if (id == null) return null;
+  final t = id.trim();
+  if (t.isEmpty || t.length > userIdMax) return null;
+  if (t.contains('@')) return (userId: sha256Hex(t.toLowerCase()), userIdHashed: true);
+  final digits = t.replaceAll(_nonDigit, '');
+  if (_phone.hasMatch(t) && digits.length >= 8 && digits.length <= 15) {
+    return (userId: sha256Hex(digits), userIdHashed: true);
+  }
+  if (_control.hasMatch(t)) return null;
+  return (userId: t, userIdHashed: false);
+}
+
+const _k = [
+  0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5, //
+  0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+  0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+  0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+  0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+  0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+  0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+  0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
+];
+
+/// SHA-256 of the UTF-8 bytes of [s], lower-case hex (FIPS 180-4; port of the React Native SDK's, so no
+/// new dependency). Every word is kept to 32 bits with `& 0xffffffff`, never by 64-bit overflow, so it
+/// gives the same answer on the VM, dart2js (JS numbers) and dart2wasm.
+String sha256Hex(String s) {
+  final bytes = [...utf8.encode(s)];
+  final bits = bytes.length * 8;
+  bytes.add(0x80);
+  while (bytes.length % 64 != 56) {
+    bytes.add(0);
+  }
+  // 64-bit big-endian length; ids are far below 2^32 bits, so the high word is 0.
+  bytes.addAll([0, 0, 0, 0, (bits >> 24) & 255, (bits >> 16) & 255, (bits >> 8) & 255, bits & 255]);
+  const m = 0xffffffff;
+  int rotr(int x, int n) => ((x >> n) | (x << (32 - n))) & m;
+  final h = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
+  final w = List<int>.filled(64, 0);
+  for (var o = 0; o < bytes.length; o += 64) {
+    for (var i = 0; i < 16; i++) {
+      final j = o + 4 * i;
+      w[i] = ((bytes[j] << 24) | (bytes[j + 1] << 16) | (bytes[j + 2] << 8) | bytes[j + 3]) & m;
+    }
+    for (var i = 16; i < 64; i++) {
+      final s0 = rotr(w[i - 15], 7) ^ rotr(w[i - 15], 18) ^ (w[i - 15] >> 3);
+      final s1 = rotr(w[i - 2], 17) ^ rotr(w[i - 2], 19) ^ (w[i - 2] >> 10);
+      w[i] = (w[i - 16] + s0 + w[i - 7] + s1) & m;
+    }
+    var a = h[0], b = h[1], c = h[2], d = h[3], e = h[4], f = h[5], g = h[6], k = h[7];
+    for (var i = 0; i < 64; i++) {
+      final ch = (e & f) ^ ((e ^ m) & g);
+      final t1 = (k + (rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25)) + ch + _k[i] + w[i]) & m;
+      final t2 = ((rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22)) + ((a & b) ^ (a & c) ^ (b & c))) & m;
+      k = g;
+      g = f;
+      f = e;
+      e = (d + t1) & m;
+      d = c;
+      c = b;
+      b = a;
+      a = (t1 + t2) & m;
+    }
+    final v = [a, b, c, d, e, f, g, k];
+    for (var i = 0; i < 8; i++) {
+      h[i] = (h[i] + v[i]) & m;
+    }
+  }
+  return h.map((v) => v.toRadixString(16).padLeft(8, '0')).join();
 }

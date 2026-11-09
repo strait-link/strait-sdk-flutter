@@ -104,7 +104,7 @@ Or pin it in `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  strait_sdk: ^0.10.6
+  strait_sdk: ^0.10.7
 ```
 
 Pure Dart (no Flutter dependency), so it works in Flutter apps and Dart servers alike.
@@ -254,6 +254,26 @@ Notes:
   platform can't tell, and the SDK then keeps the once-per-install flag alone.
 - `flutter_timezone` 5.0 and later returns a `TimezoneInfo` (hence `.identifier`);
   4.x and earlier return the `String` itself, so drop `.identifier` there.
+
+### Your user on events (`setUserId`)
+
+```dart
+strait.setUserId(user.id);   // after your sign-in, and when the app starts with a user already signed in
+strait.setUserId(null);      // on sign-out
+```
+
+Later `trackEvent` calls carry this id to your `app.event` webhook (`userId`, `userIdHashed`), so you can
+join Strait's tap, link and campaign to your own users and see which campaigns bring paying ones
+(contract B27). It is kept in memory only, never logged, ignored while `setEnabled(false)` (which also
+clears it), and not sent with app opens or installs. An event saved offline keeps the id it was tracked with.
+
+Emails and phone numbers never leave the phone: an id with `@` is sent as the SHA-256 hex of its
+lower-cased form, one made only of digits, spaces and `+ ( ) . -` with 8-15 digits as the SHA-256 hex of
+its digits, with `userIdHashed: true`. To join, hash your own value the same way
+(`sha256("priya@example.com")`, `sha256("919876543210")`). A plain numeric id of 8-15 digits is hashed
+too; prefix it (`u_12345678`) to keep it readable. Ids longer than 128 characters or holding control
+characters are not sent (and clear the previous one). Anyone with your publishable key can send any
+`userId`, so treat it as a claim, like revenue sent from the app.
 
 ### Reinstalls and backups (`installTime`, contract B6a)
 
@@ -456,8 +476,8 @@ carry no query or fragment except `utm_source`, `reportUrl`; expired remembered
 taps are deleted, `staleTap`) · B19 (iPhone paste handoff, chosen in the dashboard at runtime,
 `parseHandoffUrl`, `/v1/handoff/claim`, `claimHandoff`) · B22 (old Firebase
 page.link links: short → `/v1/resolve`, long → `link=` read on the device) · B23
-(`doctor()` setup check, `doctorFindings`). Both
-shared vector files (conformance v11) are asserted in `dart test`.
+(`doctor()` setup check, `doctorFindings`) · B27 (`setUserId`, `userIdField`). Both
+shared vector files (conformance v13) are asserted in `dart test`.
 
 ## iPhone deferred links (opt-in): you choose the method (B19)
 
