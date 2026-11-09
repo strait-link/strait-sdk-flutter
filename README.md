@@ -104,7 +104,7 @@ Or pin it in `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  strait_sdk: ^0.10.2
+  strait_sdk: ^0.10.3
 ```
 
 Pure Dart (no Flutter dependency), so it works in Flutter apps and Dart servers alike.
