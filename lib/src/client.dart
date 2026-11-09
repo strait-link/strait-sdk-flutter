@@ -558,14 +558,24 @@ class StraitLinks {
           }
         }
       }
-      final r = await answered('/v1/match', {
+      final body = {
         'publishableKey': publishableKey,
         'platform': platform,
         ..._device().toJson(),
         ...tag,
-      });
-      final matched = r.json['matched'] == true;
+      };
+      var r = await answered('/v1/match', body);
       pasteOn = pasteHandoffOn(r.json);
+      // B24 (engine ADR 0101): asked over IPv6 and nothing found, the engine names its IPv4-only URL;
+      // ask once more there (same openId, same fields). Only a match there replaces the first answer.
+      final v4 = record && r.json['matched'] != true ? ipv4MatchUrl(r.json['ipv4Match']) : null;
+      if (v4 != null) {
+        try {
+          final again = await answered(v4, body);
+          if (again.json['matched'] == true) r = again;
+        } catch (_) {}
+      }
+      final matched = r.json['matched'] == true;
       if (record && matched) _noteTap(replyClickId(r.json['clickId']), t0);
       final dest = _destination(matched ? _str(r.json['longUrl']) : null);
       return LinkEvent(
@@ -965,9 +975,11 @@ class StraitLinks {
   /// [lookupOnly] (/v1/lookup: where a short link goes, recorded nowhere, engine ADR 0083).
   Future<_Res> _call(String method, String path, [Map<String, dynamic>? body, bool lookupOnly = false]) async {
     if (!lookupOnly && !await isEnabled()) throw StateError('disabled');
-    final uri = Uri.parse('$_base$path');
+    // `path` on the endpoint, or an absolute URL (the engine's IPv4-only match URL, B24).
+    final absolute = path.startsWith('https://');
+    final uri = Uri.parse(absolute ? path : '$_base$path');
     // td2-23 (open reports carry their own, stamped when made).
-    if (body != null && _recordingPaths.contains(path)) {
+    if (body != null && _recordingPaths.contains(absolute ? uri.path : path)) {
       body = {...body, ...versionFields(_appVersion)};
     }
     // A stalled reply must not hang start() or the open queue: like the Android

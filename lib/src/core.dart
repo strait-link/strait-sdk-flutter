@@ -298,7 +298,7 @@ List<Map<String, dynamic>> pruneOpenQueue(List<Map<String, dynamic>> queue, int 
 
 /// This SDK's version, sent as `sdkVersion` with every open and install report
 /// (td2-23). Kept equal to pubspec.yaml's `version` by a test.
-const String straitSdkVersion = '0.10.2';
+const String straitSdkVersion = '0.10.3';
 
 /// `appVersion` + `sdkVersion` for a call that records an open or install (td2-23). The engine
 /// keeps 1-64 printable ASCII and drops anything else; the app version gets the same rule here:
@@ -503,6 +503,18 @@ class AppStateTracker {
 final _handoffToken = RegExp(r'^[A-Za-z0-9_-]{22}$');
 final _handoffUrl =
     RegExp(r'^([A-Za-z][A-Za-z0-9+.-]*)://([^/?#\s]+)/h/([^/?#\s]*)/?(?:[?#]\S*)?$');
+
+/// The engine's IPv4-only match URL in an unmatched first-launch `/v1/match` reply (contract B24,
+/// engine ADR 0101), or null. Only an https URL whose path is exactly `/v1/match` (no query, no
+/// fragment, no credentials).
+String? ipv4MatchUrl(Object? value) {
+  if (value is! String || value.length > 200 || !value.startsWith('https://')) return null;
+  final u = Uri.tryParse(value);
+  if (u == null || u.scheme != 'https' || u.host.isEmpty || u.path != '/v1/match' || u.hasQuery || u.hasFragment || u.userInfo.isNotEmpty) {
+    return null;
+  }
+  return value;
+}
 
 /// Whether a `/v1/match` reply says to try the paste handoff (contract B19):
 /// the workspace's live choice in Dashboard Settings -> iPhone installs,
