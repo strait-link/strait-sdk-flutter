@@ -104,7 +104,7 @@ Or pin it in `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  strait_sdk: ^0.10.5
+  strait_sdk: ^0.10.6
 ```
 
 Pure Dart (no Flutter dependency), so it works in Flutter apps and Dart servers alike.
@@ -589,6 +589,8 @@ switch is off, and lets you turn it on later without a release.
 `resolveDeferredLink` never throws — returns `MatchResult.none` on any error.
 The client sends only coarse device fields; the **server** adds the observed IP
 and computes the signature.
+
+On Android's first launch the SDK also sends the Play install referrer string as read (`installReferrer`, contract B26) with the call that records the install, so the install keeps its campaign. Strait keeps only `utm_source`, `utm_medium`, `utm_campaign`, `utm_term` and `utm_content`; `gclid` and any other parameter in it are dropped on arrival, never stored or logged. Not sent on the debug re-check, on iPhone, or while switched off.
 
 ## Test
 

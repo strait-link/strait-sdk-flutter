@@ -312,6 +312,7 @@ void main() {
         'openId': h.events.first.id,
         'at': h.events.first.at,
         'sdkVersion': 'flutter/$straitSdkVersion',
+        'installReferrer': 'utm_source=google-play&utm_medium=organic', // B26
       });
     });
 
