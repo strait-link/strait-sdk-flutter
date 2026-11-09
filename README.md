@@ -77,7 +77,7 @@ curl -s https://<your-handle>.strait.link/v1/resolve -H 'Content-Type: applicati
 
 **You should see:** `{"matched":true,"longUrl":"https://shop.example.com/product/42",…}`. The key comes from **Dashboard → Get started** and is safe in apps. `"reason":"not_found"` means the key is from another workspace or the path is wrong. The check counts as one tap in **Dashboard → Analytics**.
 
-**3. Wire it.** Paste `startStrait()` from [Use](#use-recommended-straitlinks) with your key and link address, and call it in `main()` before `runApp`. The [Flutter guide](https://straitlink.in/docs/sdks/flutter/) shows the phone setup and an `adb` command that should print the link's path.
+**3. Wire it.** Paste `startStrait()` from [Use](#use-recommended-straitlinks) with your key and link address, and call it in `main()` before `runApp`. For Android release builds, add the [internet permission](#install) to `android/app/src/main/AndroidManifest.xml`. The [Flutter guide](https://straitlink.in/docs/sdks/flutter/) shows the phone setup and an `adb` command that should print the link's path.
 
 ## Platform features
 
@@ -104,7 +104,7 @@ Or pin it in `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  strait_sdk: ^0.10.3
+  strait_sdk: ^0.10.4
 ```
 
 Pure Dart (no Flutter dependency), so it works in Flutter apps and Dart servers alike.
@@ -114,6 +114,15 @@ A Flutter app using the setup in [Use](#use-recommended-straitlinks) also needs 
 
 ```sh
 flutter pub add app_links shared_preferences play_install_referrer package_info_plus flutter_timezone
+```
+
+**Android release builds need the internet permission.** `flutter create` puts it only in the debug and
+profile manifests, so without it a release build (and the Play Store app) can't reach Strait: no links
+resolve, no deferred link, nothing recorded. Add it to `android/app/src/main/AndroidManifest.xml`, above
+`<application>`:
+
+```xml
+<uses-permission android:name="android.permission.INTERNET"/>
 ```
 
 ## Use (recommended): `StraitLinks`
