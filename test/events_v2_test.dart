@@ -21,9 +21,13 @@ const offline = 'offline';
 class Engine {
   final Map<String, Object> routes = {'/v1/event': 202, '/v1/open': 202};
   final calls = <(String, Map<String, dynamic>?)>[];
+  /// Per path, a reply the test releases later (the status it completes with).
+  final Map<String, Future<int>> hold = {};
 
   late final http.Client client = MockClient((req) async {
     calls.add((req.url.path, req.body.isEmpty ? null : jsonDecode(req.body) as Map<String, dynamic>));
+    final held = hold[req.url.path];
+    if (held != null) return http.Response('{}', await held);
     final r = routes[req.url.path] ?? 404;
     if (r == offline) throw http.ClientException('Network request failed');
     return http.Response('{}', r as int);
@@ -161,6 +165,69 @@ void main() {
       await h.strait.trackEvent('purchase', eventId: 'ord_10');
       await settle();
       expect(h.queue.first['clickId'], tap);
+    });
+  });
+
+  // Opt-out (td2-27) for queued events: nothing saved before the switch goes out later,
+  // and nothing in flight at the switch is saved for later.
+  group('opt-out and the event queue', () {
+    test('events queued before opt-out are deleted and never sent, even after switching back on', () async {
+      final h = await make();
+      h.e.routes['/v1/event'] = offline;
+      await h.strait.trackEvent('purchase', eventId: 'ord_1');
+      await h.strait.trackEvent('signup', eventId: 'ord_2');
+      await settle();
+      expect(h.queue, hasLength(2));
+      h.e.routes['/v1/event'] = 202;
+      await h.strait.setEnabled(false);
+      expect(h.queue, isEmpty);
+      h.states.add(AppLifecycle.active); // resume flush while off
+      await h.strait.flushOpenReports();
+      await settle();
+      await h.strait.setEnabled(true); // back on: flushes, but the old events are gone
+      h.states.add(AppLifecycle.active);
+      await settle();
+      expect(h.e.events.map((b) => b['eventId']), ['ord_1', 'ord_2']); // only the first, failed tries
+    });
+
+    test('an event in flight when the person opts out is not kept when it fails', () async {
+      final h = await make();
+      final reply = Completer<int>();
+      h.e.hold['/v1/event'] = reply.future;
+      final sent = h.strait.trackEvent('purchase', eventId: 'ord_3');
+      await settle();
+      await h.strait.setEnabled(false);
+      reply.complete(503);
+      expect(await sent, isFalse);
+      await settle();
+      expect(h.queue, isEmpty);
+      h.e.hold.clear();
+      await h.strait.setEnabled(true);
+      await settle();
+      expect(h.e.events, hasLength(1)); // the one try before the switch, never retried
+    });
+
+    test('a flush running when the person opts out sends nothing more and the rest is deleted', () async {
+      final h = await make();
+      h.s.data['strait.pendingOpens'] = jsonEncode([
+        for (final id in ['ord_4', 'ord_5', 'ord_6'])
+          {'type': 'event', 'at': t, 'event': 'purchase', 'platform': 'android', 'eventId': id},
+      ]);
+      final reply = Completer<int>();
+      h.e.hold['/v1/event'] = reply.future;
+      final flush = h.strait.flushOpenReports();
+      await settle();
+      final off = h.strait.setEnabled(false);
+      await settle();
+      reply.complete(202); // the first one was already on the wire
+      await flush;
+      await off;
+      expect(h.e.events.map((b) => b['eventId']), ['ord_4']);
+      expect(h.queue, isEmpty);
+      h.e.hold.clear();
+      await h.strait.setEnabled(true);
+      await settle();
+      expect(h.e.events.map((b) => b['eventId']), ['ord_4']);
     });
   });
 }
