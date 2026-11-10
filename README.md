@@ -104,7 +104,7 @@ Or pin it in `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  strait_sdk: ^0.10.7
+  strait_sdk: ^0.10.8
 ```
 
 Pure Dart (no Flutter dependency), so it works in Flutter apps and Dart servers alike.
@@ -269,9 +269,11 @@ clears it), and not sent with app opens or installs. The id is read when you cal
 offline keeps that id on the device until it is sent (up to 7 days; deleted on opt-out).
 
 Emails and phone numbers never leave the phone: an id with `@` is sent as the SHA-256 hex of its
-lower-cased form, one made only of digits, spaces and `+ ( ) . -` with 8-15 digits as the SHA-256 hex of
-its digits, with `userIdHashed: true`. To join, hash your own value the same way
-(`sha256("priya@example.com")`, `sha256("919876543210")`). A plain numeric id of 8-15 digits is hashed
+lower-cased form, a phone number (8-15 digits with any spaces, dashes, dots, brackets
+or slashes, an optional `+`, `00` or `tel:`; Indian, Arabic and full-width digits too) as the SHA-256 hex of `+` and
+its digits when written with `+` or `00`, else of its digits, with `userIdHashed: true` (shared-spec ADR 0010). To
+join, hash your own value the same way (`sha256("priya@example.com")`, `sha256("+919876543210")` for a number
+stored in E.164). A plain numeric id of 8-15 digits is hashed
 too; prefix it (`u_12345678`) to keep it readable. Ids longer than 128 characters or holding control
 characters are not sent (and clear the previous one). Anyone with your publishable key can send any
 `userId`, so treat it as a claim, like revenue sent from the app.

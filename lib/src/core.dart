@@ -298,7 +298,7 @@ List<Map<String, dynamic>> pruneOpenQueue(List<Map<String, dynamic>> queue, int 
 
 /// This SDK's version, sent as `sdkVersion` = `flutter/<it>` with every open and install report
 /// (td2-23, B25). Kept equal to pubspec.yaml's `version` by a test.
-const String straitSdkVersion = '0.10.7';
+const String straitSdkVersion = '0.10.8';
 
 /// The longest Play install referrer the engine reads (engine ADR 0106); a longer one is not sent.
 const int installReferrerMax = 4096;
@@ -559,8 +559,6 @@ String? parseHandoffUrl(String? text, List<String> linkHosts) {
 /// The longest user id the SDK sends (after trimming); a longer one is not sent (engine ADR 0110).
 const int userIdMax = 128;
 
-final _phone = RegExp(r'^\+?[0-9 ().-]+$');
-final _nonDigit = RegExp(r'\D');
 final _control = RegExp(r'[\x00-\x1f\x7f]');
 
 /// [s] trimmed with JavaScript's `String.prototype.trim` set (contract B27): Dart's own trim also strips U+0085.
@@ -578,22 +576,59 @@ String _jsTrim(String s) {
   return s.substring(a, b);
 }
 
-/// B27 (shared-spec ADR 0009): what `setUserId(id)` sends with later events, or null (nothing sent).
+/// B27 (shared-spec ADR 0009, ADR 0010): what `setUserId(id)` sends with later events, or null (nothing sent).
 /// In this order: trimmed (JavaScript's whitespace set); empty or longer than [userIdMax] UTF-16 units =
-/// null; an email (any `@`) is sent as the SHA-256 hex of its lower-case form, a phone number (only digits, spaces,
-/// `+ ( ) . -`, with 8-15 digits) as the SHA-256 hex of its digits: `userIdHashed: true`, the raw value
-/// never leaves the device; holding a control character = null; else the trimmed id.
+/// null; an email (any `@`, `＠` or `﹫`) is sent as the SHA-256 hex of its lower-case form, a phone number
+/// ([phoneNumberForm]) as the SHA-256 hex of its canonical form: `userIdHashed: true`, the raw value never
+/// leaves the device; holding a control character = null; else the trimmed id.
 ({String userId, bool userIdHashed})? userIdField(String? id) {
   if (id == null) return null;
   final t = _jsTrim(id);
   if (t.isEmpty || t.length > userIdMax) return null;
-  if (t.contains('@')) return (userId: sha256Hex(t.toLowerCase()), userIdHashed: true);
-  final digits = t.replaceAll(_nonDigit, '');
-  if (_phone.hasMatch(t) && digits.length >= 8 && digits.length <= 15) {
-    return (userId: sha256Hex(digits), userIdHashed: true);
+  if (t.codeUnits.any((c) => c == 0x40 || c == 0xff20 || c == 0xfe6b)) {
+    return (userId: sha256Hex(t.toLowerCase()), userIdHashed: true);
   }
+  final phone = phoneNumberForm(t);
+  if (phone != null) return (userId: sha256Hex(phone), userIdHashed: true);
   if (_control.hasMatch(t)) return null;
   return (userId: t, userIdHashed: false);
+}
+
+/// The zero of each run of ten decimal digits B27 reads: ASCII, Arabic-Indic, Eastern Arabic-Indic, Devanagari,
+/// Bengali, Gurmukhi, Gujarati, Oriya, Tamil, Telugu, Kannada, Malayalam, full-width.
+const _digitZeros = [0x30, 0x660, 0x6f0, 0x966, 0x9e6, 0xa66, 0xae6, 0xb66, 0xbe6, 0xc66, 0xce6, 0xd66, 0xff10];
+
+/// Characters a written phone number may hold between its digits (B27 v15): spaces, dashes (incl. Japanese ー),
+/// dots, brackets, slashes, invisible marks.
+bool _isPhoneSeparator(int c) =>
+    c == 0x20 || c == 0x28 || c == 0x29 || c == 0x2d || c == 0x2e || c == 0x2f || c == 0xa0 ||
+    (c >= 0x2000 && c <= 0x2015) || (c >= 0x202a && c <= 0x202f) || c == 0x205f || c == 0x2060 ||
+    (c >= 0x2066 && c <= 0x2069) || c == 0xad || c == 0x61c || c == 0x30fc || c == 0xff70 || c == 0x2212 ||
+    c == 0x3000 || c == 0xfeff || c == 0xff08 || c == 0xff09 || (c >= 0xff0d && c <= 0xff0f);
+
+/// B27 v15 (shared-spec ADR 0010): the canonical form of a phone number, or null when [t] is not one. After an
+/// optional `tel:` (any ASCII case), [t] may hold only decimal digits (any [_digitZeros] run), separators and one
+/// `+` / `＋` before the first digit, with 8-15 digits (8-17 when they start with the international `00` and there
+/// is no `+`). Form: `+` and the digits when written with `+`; `+` and the digits after `00`; else the digits (ASCII).
+String? phoneNumberForm(String t) {
+  final units = t.codeUnits;
+  final tel = units.length >= 4 && units.take(4).every((c) => c < 0x80) && t.substring(0, 4).toLowerCase() == 'tel:';
+  var plus = false;
+  final digits = StringBuffer();
+  for (final c in tel ? units.skip(4) : units) {
+    final zero = _digitZeros.where((z) => c >= z && c <= z + 9).firstOrNull;
+    if (zero != null) {
+      digits.write(c - zero);
+    } else if ((c == 0x2b || c == 0xff0b) && !plus && digits.isEmpty) {
+      plus = true;
+    } else if (!_isPhoneSeparator(c)) {
+      return null;
+    }
+  }
+  final d = digits.toString();
+  final zeroZero = !plus && d.startsWith('00');
+  if (d.length < 8 || d.length > (zeroZero ? 17 : 15)) return null;
+  return plus ? '+$d' : zeroZero ? '+${d.substring(2)}' : d;
 }
 
 const _k = [
