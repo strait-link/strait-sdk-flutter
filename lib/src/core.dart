@@ -298,7 +298,7 @@ List<Map<String, dynamic>> pruneOpenQueue(List<Map<String, dynamic>> queue, int 
 
 /// This SDK's version, sent as `sdkVersion` = `flutter/<it>` with every open and install report
 /// (td2-23, B25). Kept equal to pubspec.yaml's `version` by a test.
-const String straitSdkVersion = '0.10.8';
+const String straitSdkVersion = '0.10.9';
 
 /// The longest Play install referrer the engine reads (engine ADR 0106); a longer one is not sent.
 const int installReferrerMax = 4096;
@@ -576,9 +576,14 @@ String _jsTrim(String s) {
   return s.substring(a, b);
 }
 
+/// B27 v16 (shared-spec ADR 0011): lower case per code point, no context, no language, so every runtime agrees:
+/// `İ` → `i̇` (i + U+0307; the Dart VM gave `i`) and `Σ` → `σ` first (on the web, JavaScript's final-sigma rule
+/// gives `ς` at the end of a word).
+String _lowerEmail(String s) => s.replaceAll('\u0130', 'i\u0307').replaceAll('\u03a3', '\u03c3').toLowerCase();
+
 /// B27 (shared-spec ADR 0009, ADR 0010): what `setUserId(id)` sends with later events, or null (nothing sent).
 /// In this order: trimmed (JavaScript's whitespace set); empty or longer than [userIdMax] UTF-16 units =
-/// null; an email (any `@`, `＠` or `﹫`) is sent as the SHA-256 hex of its lower-case form, a phone number
+/// null; an email (any `@`, `＠` or `﹫`) is sent as the SHA-256 hex of [_lowerEmail] of it, a phone number
 /// ([phoneNumberForm]) as the SHA-256 hex of its canonical form: `userIdHashed: true`, the raw value never
 /// leaves the device; holding a control character = null; else the trimmed id.
 ({String userId, bool userIdHashed})? userIdField(String? id) {
@@ -586,7 +591,7 @@ String _jsTrim(String s) {
   final t = _jsTrim(id);
   if (t.isEmpty || t.length > userIdMax) return null;
   if (t.codeUnits.any((c) => c == 0x40 || c == 0xff20 || c == 0xfe6b)) {
-    return (userId: sha256Hex(t.toLowerCase()), userIdHashed: true);
+    return (userId: sha256Hex(_lowerEmail(t)), userIdHashed: true);
   }
   final phone = phoneNumberForm(t);
   if (phone != null) return (userId: sha256Hex(phone), userIdHashed: true);
