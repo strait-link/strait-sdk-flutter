@@ -8,7 +8,8 @@ import 'package:test/test.dart';
 
 const pk = 'st_pub_test_appowner01';
 const endpoint = 'https://links.test';
-const device = DeviceFields(screenWidth: 411, pixelRatio: 2.625, language: 'en', timezone: 'Asia/Kolkata');
+const device = DeviceFields(
+    screenWidth: 411, pixelRatio: 2.625, language: 'en', timezone: 'Asia/Kolkata');
 
 class Call {
   final String method;
@@ -24,9 +25,12 @@ class FakeEngine {
   FakeEngine(this.routes);
 
   late final http.Client client = MockClient((req) async {
-    calls.add(Call(req.method, req.url.path, req.body.isEmpty ? null : jsonDecode(req.body) as Map<String, dynamic>));
+    calls.add(Call(req.method, req.url.path,
+        req.body.isEmpty ? null : jsonDecode(req.body) as Map<String, dynamic>));
     final payload = routes[req.url.path];
-    return payload == null ? http.Response('', 404) : http.Response(jsonEncode(payload), 200);
+    return payload == null
+        ? http.Response('', 404)
+        : http.Response(jsonEncode(payload), 200);
   });
 
   Call? find(String path, [String method = 'POST']) {
@@ -57,8 +61,8 @@ class Harness {
     strait.onLink.listen(events.add);
   }
 
-  Future<void> start({String? initialUrl}) =>
-      strait.start(initialUrl: initialUrl, urls: phone.urls.stream, lifecycle: phone.states.stream);
+  Future<void> start({String? initialUrl}) => strait.start(
+      initialUrl: initialUrl, urls: phone.urls.stream, lifecycle: phone.states.stream);
 }
 
 Harness make(FakeEngine engine,
@@ -83,7 +87,12 @@ Harness make(FakeEngine engine,
 Future<void> flush() => Future<void>.delayed(Duration.zero);
 
 const resolved = {
-  '/v1/resolve': {'matched': true, 'longUrl': 'https://shop.example/p/42?color=red', 'linkId': 'lnk_42', 'slug': 'sale'}
+  '/v1/resolve': {
+    'matched': true,
+    'longUrl': 'https://shop.example/p/42?color=red',
+    'linkId': 'lnk_42',
+    'slug': 'sale'
+  }
 };
 
 void main() {
@@ -287,11 +296,9 @@ void main() {
     });
 
     test('no referrer link → fingerprint match, not matched when nothing found', () async {
-      final h = make(
-          FakeEngine({
-            '/v1/match': {'matched': false, 'matchMethod': 'none'}
-          }),
-          referrer: 'utm_source=google-play&utm_medium=organic');
+      final h = make(FakeEngine({
+        '/v1/match': {'matched': false, 'matchMethod': 'none'}
+      }), referrer: 'utm_source=google-play&utm_medium=organic');
       await h.start();
       await flush();
       expect(h.events.first.kind, LinkKind.deferred);
@@ -310,12 +317,10 @@ void main() {
     });
 
     test('referrer lookup misses → falls back to /v1/match', () async {
-      final h = make(
-          FakeEngine({
-            '/v1/referrer': {'matched': false},
-            '/v1/match': {'matched': true, 'longUrl': 'https://shop.example/x', 'linkId': 'lnk_9'},
-          }),
-          referrer: 'strait_link=lnk_7');
+      final h = make(FakeEngine({
+        '/v1/referrer': {'matched': false},
+        '/v1/match': {'matched': true, 'longUrl': 'https://shop.example/x', 'linkId': 'lnk_9'},
+      }), referrer: 'strait_link=lnk_7');
       await h.start();
       await flush();
       expect(h.engine.calls.map((c) => c.path), ['/v1/referrer', '/v1/match']);
@@ -325,12 +330,9 @@ void main() {
     });
 
     test('iOS goes straight to /v1/match with device fields (B8)', () async {
-      final h = make(
-          FakeEngine({
-            '/v1/match': {'matched': true, 'longUrl': 'https://shop.example/x?a=1'}
-          }),
-          platform: 'ios',
-          referrer: 'strait_link=lnk_7');
+      final h = make(FakeEngine({
+        '/v1/match': {'matched': true, 'longUrl': 'https://shop.example/x?a=1'}
+      }), platform: 'ios', referrer: 'strait_link=lnk_7');
       await h.start();
       await flush();
       expect(h.engine.calls.map((c) => c.path), ['/v1/match']);
@@ -362,12 +364,8 @@ void main() {
         final paths = <String>[];
         bodies.clear();
         final strait = StraitLinks(
-          publishableKey: pk,
-          endpoint: endpoint,
-          platform: 'android',
-          deviceFields: () => device,
-          storage: storage,
-          installReferrer: () async => null,
+          publishableKey: pk, endpoint: endpoint, platform: 'android',
+          deviceFields: () => device, storage: storage, installReferrer: () async => null,
           client: MockClient((req) async {
             paths.add(req.url.path);
             if (req.body.isNotEmpty) bodies[req.url.path] = jsonDecode(req.body) as Map<String, dynamic>;
@@ -422,7 +420,8 @@ void main() {
 
       test('a link before the check starts: no start signal left without its event', () async {
         final gate = Completer<void>();
-        final (strait, phone, events, _, paths) = held(gate, () => http.Response(jsonEncode({'matched': false}), 200));
+        final (strait, phone, events, _, paths) =
+            held(gate, () => http.Response(jsonEncode({'matched': false}), 200));
         var opening = false; // the documented loading pattern: on at any start, off at any event
         strait.onLinkStart.listen((_) => opening = true);
         strait.onLink.listen((_) => opening = false);
@@ -444,8 +443,7 @@ void main() {
         final (strait, phone, events, storage, paths) = held(
             gate,
             () => http.Response(
-                jsonEncode(
-                    {'matched': true, 'longUrl': 'https://shop.example/promo/7', 'linkId': 'lnk_7', 'clickId': 'c-7'}),
+                jsonEncode({'matched': true, 'longUrl': 'https://shop.example/promo/7', 'linkId': 'lnk_7', 'clickId': 'c-7'}),
                 200));
         var opening = false;
         strait.onLinkStart.listen((_) => opening = true);
@@ -471,7 +469,8 @@ void main() {
 
       test('with no link this launch, the no-match is still delivered', () async {
         final gate = Completer<void>()..complete();
-        final (strait, phone, events, _, _) = held(gate, () => http.Response(jsonEncode({'matched': false}), 200));
+        final (strait, phone, events, _, _) =
+            held(gate, () => http.Response(jsonEncode({'matched': false}), 200));
         await strait.start(urls: phone.urls.stream, lifecycle: phone.states.stream);
         await flush();
         expect(events.map((e) => (e.kind, e.matched, e.reason)), [(LinkKind.deferred, false, 'no_match')]);
@@ -486,7 +485,8 @@ void main() {
       }));
       final report = await h.strait.reportFingerprint();
       expect(report!['extHash'], 'abc');
-      expect(h.engine.find('/v1/debug/fingerprint')!.body, {'publishableKey': pk, 'origin': 'app', ...device.toJson()});
+      expect(h.engine.find('/v1/debug/fingerprint')!.body,
+          {'publishableKey': pk, 'origin': 'app', ...device.toJson()});
       final cmp = await h.strait.compareFingerprint();
       expect(cmp!['coreHash'], 'def');
       expect(h.engine.find('/v1/debug/fingerprint', 'GET'), isNotNull);
@@ -496,7 +496,8 @@ void main() {
       final h = make(FakeEngine({
         '/v1/event': {'ok': true}
       }));
-      expect(await h.strait.trackEvent('purchase', value: 49.99, currency: 'USD', linkId: 'lnk_42'), isTrue);
+      expect(await h.strait.trackEvent('purchase', value: 49.99, currency: 'USD', linkId: 'lnk_42'),
+          isTrue);
       expect(h.engine.calls.last.body, {
         'publishableKey': pk,
         'event': 'purchase',
@@ -513,16 +514,12 @@ void main() {
     const tap = '3f2a9c1e-7b4d-4e8a-9c0f-1a2b3c4d5e6f';
     const other = '11111111-2222-4333-8444-555555555555';
     const day = 24 * 60 * 60 * 1000;
-    Map<String, dynamic>? eventBody(FakeEngine e) => e.calls.where((c) => c.path == '/v1/event').lastOrNull?.body;
+    Map<String, dynamic>? eventBody(FakeEngine e) =>
+        e.calls.where((c) => c.path == '/v1/event').lastOrNull?.body;
 
     test('a browser hand-off tap is remembered and attached to a purchase', () async {
       final store = MemoryStore();
-      final h = make(
-          FakeEngine({
-            '/v1/event': {'ok': true},
-            '/v1/open': {'ok': true}
-          }),
-          storage: store);
+      final h = make(FakeEngine({'/v1/event': {'ok': true}, '/v1/open': {'ok': true}}), storage: store);
       await h.start(initialUrl: 'straitlink://shop.example/p/42?strait_click=$tap');
       h.phone.advance(day);
       await h.strait.trackEvent('purchase', value: 5, currency: 'USD');
@@ -531,10 +528,7 @@ void main() {
     });
 
     test('not after 7 days', () async {
-      final h = make(FakeEngine({
-        '/v1/event': {'ok': true},
-        '/v1/open': {'ok': true}
-      }));
+      final h = make(FakeEngine({'/v1/event': {'ok': true}, '/v1/open': {'ok': true}}));
       await h.start(initialUrl: 'straitlink://shop.example/p/42?strait_click=$tap');
       h.phone.advance(7 * day + 1);
       await h.strait.trackEvent('purchase');
@@ -542,20 +536,14 @@ void main() {
     });
 
     test('an explicit clickId overrides the remembered tap', () async {
-      final h = make(FakeEngine({
-        '/v1/event': {'ok': true},
-        '/v1/open': {'ok': true}
-      }));
+      final h = make(FakeEngine({'/v1/event': {'ok': true}, '/v1/open': {'ok': true}}));
       await h.start(initialUrl: 'straitlink://shop.example/p/42?strait_click=$tap');
       await h.strait.trackEvent('purchase', clickId: other);
       expect(eventBody(h.engine)!['clickId'], other);
     });
 
     test('no remembered tap: no clickId', () async {
-      final h = make(FakeEngine({
-        '/v1/event': {'ok': true},
-        '/v1/match': {'matched': false}
-      }));
+      final h = make(FakeEngine({'/v1/event': {'ok': true}, '/v1/match': {'matched': false}}));
       await h.start();
       await h.strait.trackEvent('signup');
       expect(eventBody(h.engine)!.containsKey('clickId'), isFalse);
@@ -573,21 +561,15 @@ void main() {
       expect(eventBody(h.engine)!['clickId'], tap);
     });
 
-    test('a newer short-link open with no tap id in the reply (older engine) forgets the older tap', testOn: 'vm',
-        () async {
-      final h = make(FakeEngine({
-        ...resolved,
-        '/v1/event': {'ok': true},
-        '/v1/open': {'ok': true}
-      }));
+    test('a newer short-link open with no tap id in the reply (older engine) forgets the older tap', testOn: 'vm', () async {
+      final h = make(FakeEngine({...resolved, '/v1/event': {'ok': true}, '/v1/open': {'ok': true}}));
       await h.start(initialUrl: 'straitlink://shop.example/p/42?strait_click=$tap');
       await h.strait.handleUrl('https://links.test/sale');
       await h.strait.trackEvent('purchase');
       expect(eventBody(h.engine)!.containsKey('clickId'), isFalse);
     });
 
-    test('B16: a short-link open remembers the tap id the engine returns, replacing the older tap', testOn: 'vm',
-        () async {
+    test('B16: a short-link open remembers the tap id the engine returns, replacing the older tap', testOn: 'vm', () async {
       final store = MemoryStore();
       final h = make(
           FakeEngine({
@@ -639,11 +621,7 @@ void main() {
     });
 
     test('unreadable storage never blocks the event', () async {
-      final h = make(
-          FakeEngine({
-            '/v1/event': {'ok': true},
-            '/v1/open': {'ok': true}
-          }),
+      final h = make(FakeEngine({'/v1/event': {'ok': true}, '/v1/open': {'ok': true}}),
           storage: _BrokenStore());
       await h.start(initialUrl: 'straitlink://x.example/?strait_click=$tap');
       expect(await h.strait.trackEvent('purchase'), isTrue);

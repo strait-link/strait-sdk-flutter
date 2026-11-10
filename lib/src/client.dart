@@ -181,7 +181,6 @@ class StraitLinks {
   final String? Function()? _deviceClass;
   final String? _appVersion;
   bool _firstLaunch = false;
-
   /// A direct link arrived in this launch (B6: the first-launch check then stays quiet).
   bool _directArrived = false;
 
@@ -401,7 +400,8 @@ class StraitLinks {
 
   /// Resolve one URL handed to the app. [appState] defaults to the tracker's
   /// label (background / foreground). Reports the open (B14). Never throws (B10).
-  Future<LinkEvent> handleUrl(String raw, {AppStateAtLink? appState}) => _handleUrl(raw, appState, false);
+  Future<LinkEvent> handleUrl(String raw, {AppStateAtLink? appState}) =>
+      _handleUrl(raw, appState, false);
 
   Future<LinkEvent> _handleUrl(String raw, AppStateAtLink? appState, bool firstLaunch) async {
     _directArrived = true;
@@ -413,15 +413,8 @@ class StraitLinks {
     final c = classifyUrl(raw, _linkHosts);
     if (c == null) {
       return _emit(LinkEvent(
-        id: id,
-        kind: LinkKind.direct,
-        route: LinkRoute.appLink,
-        appState: state,
-        rawUrl: raw,
-        matched: false,
-        reason: 'invalid_url',
-        ms: _now() - t0,
-        at: t0,
+        id: id, kind: LinkKind.direct, route: LinkRoute.appLink, appState: state,
+        rawUrl: raw, matched: false, reason: 'invalid_url', ms: _now() - t0, at: t0,
       ));
     }
     // Where a short link goes, recorded nowhere (/v1/lookup): key + host + path, no query; no open
@@ -430,29 +423,18 @@ class StraitLinks {
     Future<LinkEvent> lookupOnly(String fallback) async {
       Map<String, dynamic> json = const {};
       try {
-        final r = await _call(
-            'POST', '/v1/lookup', {'publishableKey': publishableKey, 'url': reportUrl(raw).split('?').first}, true);
+        final r = await _call('POST', '/v1/lookup', {'publishableKey': publishableKey, 'url': reportUrl(raw).split('?').first}, true);
         if (r.ok) json = r.json;
       } catch (_) {}
       final matched = json['matched'] == true;
       final dest = _destination(matched ? _str(json['longUrl']) : null);
       return _emit(LinkEvent(
-        id: id,
-        kind: LinkKind.direct,
-        route: LinkRoute.appLink,
-        appState: state,
-        rawUrl: raw,
-        matched: matched,
-        reason: matched ? null : (_str(json['reason']) ?? fallback),
-        url: dest.url,
-        path: dest.path,
-        params: dest.params,
-        linkId: _str(json['linkId']),
-        ms: _now() - t0,
-        at: t0,
+        id: id, kind: LinkKind.direct, route: LinkRoute.appLink, appState: state,
+        rawUrl: raw, matched: matched, reason: matched ? null : (_str(json['reason']) ?? fallback),
+        url: dest.url, path: dest.path, params: dest.params,
+        linkId: _str(json['linkId']), ms: _now() - t0, at: t0,
       ));
     }
-
     if (c.needsResolve && !on) return lookupOnly('disabled');
     // Web: a lookup only; a web open is counted only for a landing that carries a tap id (below).
     if (c.needsResolve && _onWeb) return lookupOnly('network');
@@ -462,15 +444,8 @@ class StraitLinks {
       // B18: only host + path (+ utm_source) leave the device or reach storage.
       final sent = reportUrl(raw);
       final base = <String, dynamic>{
-        'openId': id,
-        'kind': 'direct',
-        'route': 'app_link',
-        'appState': state.name,
-        'platform': platform,
-        'url': sent,
-        'matched': false,
-        'firstLaunch': firstLaunch,
-        'at': t0,
+        'openId': id, 'kind': 'direct', 'route': 'app_link', 'appState': state.name,
+        'platform': platform, 'url': sent, 'matched': false, 'firstLaunch': firstLaunch, 'at': t0,
         ...versionFields(_appVersion),
       };
       try {
@@ -498,34 +473,18 @@ class StraitLinks {
         }
         final dest = _destination(matched ? _str(r.json['longUrl']) : null);
         return _emit(LinkEvent(
-          id: id,
-          kind: LinkKind.direct,
-          route: LinkRoute.appLink,
-          appState: state,
-          rawUrl: raw,
-          matched: matched,
-          reason: reason,
-          url: dest.url,
-          path: dest.path,
-          params: dest.params,
-          linkId: linkId,
-          ms: _now() - t0,
-          at: t0,
+          id: id, kind: LinkKind.direct, route: LinkRoute.appLink, appState: state,
+          rawUrl: raw, matched: matched, reason: reason,
+          url: dest.url, path: dest.path, params: dest.params,
+          linkId: linkId, ms: _now() - t0, at: t0,
         ));
       } catch (_) {
         // Switched off while the resolve was out (F4): route the way an opted-out tap does.
         if (!await isEnabled()) return lookupOnly('disabled');
         unawaited(_enqueue({...base, 'reason': 'network'}));
         return _emit(LinkEvent(
-          id: id,
-          kind: LinkKind.direct,
-          route: LinkRoute.appLink,
-          appState: state,
-          rawUrl: raw,
-          matched: false,
-          reason: 'network',
-          ms: _now() - t0,
-          at: t0,
+          id: id, kind: LinkKind.direct, route: LinkRoute.appLink, appState: state,
+          rawUrl: raw, matched: false, reason: 'network', ms: _now() - t0, at: t0,
         ));
       }
     }
@@ -537,31 +496,17 @@ class StraitLinks {
     if (on && (!_onWeb || c.clickId != null)) {
       // Navigation never waits for the report.
       unawaited(_report({
-        'openId': _onWeb ? 'web-${c.clickId}' : id,
-        'kind': 'direct',
-        'route': c.route.value,
-        'appState': state.name,
-        'platform': _onWeb ? 'web' : platform,
+        'openId': _onWeb ? 'web-${c.clickId}' : id, 'kind': 'direct', 'route': c.route.value,
+        'appState': state.name, 'platform': _onWeb ? 'web' : platform,
         'url': c.url == null ? null : reportUrl(c.url!),
         if (c.clickId != null) 'clickId': c.clickId,
-        'matched': true,
-        'firstLaunch': firstLaunch,
-        'at': t0,
+        'matched': true, 'firstLaunch': firstLaunch, 'at': t0,
         ...versionFields(_appVersion),
       }));
     }
     return _emit(LinkEvent(
-      id: id,
-      kind: LinkKind.direct,
-      route: c.route,
-      appState: state,
-      rawUrl: raw,
-      matched: true,
-      url: c.url,
-      path: c.path,
-      params: c.params,
-      ms: _now() - t0,
-      at: t0,
+      id: id, kind: LinkKind.direct, route: c.route, appState: state, rawUrl: raw,
+      matched: true, url: c.url, path: c.path, params: c.params, ms: _now() - t0, at: t0,
     ));
   }
 
@@ -578,14 +523,8 @@ class StraitLinks {
     final id = newOpenId(t0);
     if (!await isEnabled()) {
       return LinkEvent(
-        id: id,
-        kind: LinkKind.deferred,
-        route: LinkRoute.fingerprint,
-        appState: AppStateAtLink.closed,
-        matched: false,
-        reason: 'disabled',
-        ms: 0,
-        at: t0,
+        id: id, kind: LinkKind.deferred, route: LinkRoute.fingerprint,
+        appState: AppStateAtLink.closed, matched: false, reason: 'disabled', ms: 0, at: t0,
       );
     }
     final tag = record ? {'openId': id, 'at': t0} : const <String, Object>{'record': false};
@@ -635,18 +574,11 @@ class StraitLinks {
             if (record) _noteTap(replyClickId(r.json['clickId'], clickId), t0);
             final dest = _destination(_str(r.json['longUrl']));
             return LinkEvent(
-              id: id,
-              kind: LinkKind.deferred,
-              route: LinkRoute.installReferrer,
-              appState: AppStateAtLink.closed,
-              matched: true,
-              url: dest.url,
-              path: dest.path,
-              params: dest.params,
+              id: id, kind: LinkKind.deferred, route: LinkRoute.installReferrer,
+              appState: AppStateAtLink.closed, matched: true,
+              url: dest.url, path: dest.path, params: dest.params,
               linkId: _str(r.json['linkId']) ?? linkId,
-              referralCode: replyReferralCode(r.json['referralCode']),
-              ms: _now() - t0,
-              at: t0,
+              referralCode: replyReferralCode(r.json['referralCode']), ms: _now() - t0, at: t0,
             );
           }
         }
@@ -673,19 +605,12 @@ class StraitLinks {
       if (record && matched) _noteTap(replyClickId(r.json['clickId']), t0);
       final dest = _destination(matched ? _str(r.json['longUrl']) : null);
       return LinkEvent(
-        id: id,
-        kind: LinkKind.deferred,
-        route: LinkRoute.fingerprint,
-        appState: AppStateAtLink.closed,
-        matched: matched,
+        id: id, kind: LinkKind.deferred, route: LinkRoute.fingerprint,
+        appState: AppStateAtLink.closed, matched: matched,
         reason: matched ? null : 'no_match',
-        url: dest.url,
-        path: dest.path,
-        params: dest.params,
+        url: dest.url, path: dest.path, params: dest.params,
         linkId: _str(r.json['linkId']),
-        referralCode: matched ? replyReferralCode(r.json['referralCode']) : null,
-        ms: _now() - t0,
-        at: t0,
+        referralCode: matched ? replyReferralCode(r.json['referralCode']) : null, ms: _now() - t0, at: t0,
       );
     }
 
@@ -694,14 +619,9 @@ class StraitLinks {
       result = await signal();
     } catch (_) {
       result = LinkEvent(
-        id: id,
-        kind: LinkKind.deferred,
-        route: LinkRoute.fingerprint,
-        appState: AppStateAtLink.closed,
-        matched: false,
-        reason: 'network',
-        ms: _now() - t0,
-        at: t0,
+        id: id, kind: LinkKind.deferred, route: LinkRoute.fingerprint,
+        appState: AppStateAtLink.closed, matched: false, reason: 'network',
+        ms: _now() - t0, at: t0,
       );
     }
     // B19: device matching first; the clipboard only when the engine answered
@@ -712,10 +632,7 @@ class StraitLinks {
     // Once a link is here the result won't be delivered: don't read the
     // clipboard (that shows iOS's paste prompt for nothing). Nor once the app
     // switched Strait off during the check (F7): no paste prompt for an opted-out person.
-    if (result.matched ||
-        quiet() ||
-        !(record && pasteOn && platform == 'ios' && _clipboard != null) ||
-        !await isEnabled()) {
+    if (result.matched || quiet() || !(record && pasteOn && platform == 'ios' && _clipboard != null) || !await isEnabled()) {
       return done(result);
     }
     final token = await _handoffToken(() => quiet() || _enabled == false);
@@ -731,29 +648,17 @@ class StraitLinks {
       _noteTap(replyClickId(c.json['clickId']), t0);
       final dest = _destination(_str(c.json['longUrl']));
       return done(LinkEvent(
-        id: id,
-        kind: LinkKind.deferred,
-        route: LinkRoute.clipboard,
-        appState: AppStateAtLink.closed,
-        matched: true,
-        url: dest.url,
-        path: dest.path,
-        params: dest.params,
+        id: id, kind: LinkKind.deferred, route: LinkRoute.clipboard,
+        appState: AppStateAtLink.closed, matched: true,
+        url: dest.url, path: dest.path, params: dest.params,
         linkId: _str(c.json['linkId']),
-        referralCode: replyReferralCode(c.json['referralCode']),
-        ms: _now() - t0,
-        at: t0,
+        referralCode: replyReferralCode(c.json['referralCode']), ms: _now() - t0, at: t0,
       ));
     } catch (_) {
       return done(LinkEvent(
-        id: id,
-        kind: LinkKind.deferred,
-        route: LinkRoute.clipboard,
-        appState: AppStateAtLink.closed,
-        matched: false,
-        reason: 'network',
-        ms: _now() - t0,
-        at: t0,
+        id: id, kind: LinkKind.deferred, route: LinkRoute.clipboard,
+        appState: AppStateAtLink.closed, matched: false, reason: 'network',
+        ms: _now() - t0, at: t0,
       ));
     }
   }
@@ -782,14 +687,9 @@ class StraitLinks {
     final token = parseHandoffUrl(text, _linkHosts);
     if (token == null || !await isEnabled()) {
       return _emit(LinkEvent(
-        id: id,
-        kind: LinkKind.deferred,
-        route: LinkRoute.clipboard,
-        appState: AppStateAtLink.closed,
-        matched: false,
-        reason: token == null ? 'not_handoff' : 'disabled',
-        ms: _now() - t0,
-        at: t0,
+        id: id, kind: LinkKind.deferred, route: LinkRoute.clipboard,
+        appState: AppStateAtLink.closed, matched: false, reason: token == null ? 'not_handoff' : 'disabled',
+        ms: _now() - t0, at: t0,
       ));
     }
     try {
@@ -806,30 +706,18 @@ class StraitLinks {
       if (matched) _noteTap(replyClickId(r.json['clickId']), t0);
       final dest = _destination(matched ? _str(r.json['longUrl']) : null);
       return _emit(LinkEvent(
-        id: id,
-        kind: LinkKind.deferred,
-        route: LinkRoute.clipboard,
-        appState: AppStateAtLink.closed,
-        matched: matched,
+        id: id, kind: LinkKind.deferred, route: LinkRoute.clipboard,
+        appState: AppStateAtLink.closed, matched: matched,
         reason: matched ? null : (_str(r.json['reason']) ?? 'handoff_unknown'),
-        url: dest.url,
-        path: dest.path,
-        params: dest.params,
+        url: dest.url, path: dest.path, params: dest.params,
         linkId: _str(r.json['linkId']),
-        referralCode: matched ? replyReferralCode(r.json['referralCode']) : null,
-        ms: _now() - t0,
-        at: t0,
+        referralCode: matched ? replyReferralCode(r.json['referralCode']) : null, ms: _now() - t0, at: t0,
       ));
     } catch (_) {
       return _emit(LinkEvent(
-        id: id,
-        kind: LinkKind.deferred,
-        route: LinkRoute.clipboard,
-        appState: AppStateAtLink.closed,
-        matched: false,
-        reason: 'network',
-        ms: _now() - t0,
-        at: t0,
+        id: id, kind: LinkKind.deferred, route: LinkRoute.clipboard,
+        appState: AppStateAtLink.closed, matched: false, reason: 'network',
+        ms: _now() - t0, at: t0,
       ));
     }
   }
@@ -966,8 +854,7 @@ class StraitLinks {
         'publishableKey': publishableKey,
         'origin': 'app',
         ..._device().toJson(),
-      }))
-          .json;
+      })).json;
     } catch (_) {
       return null;
     }
@@ -977,7 +864,9 @@ class StraitLinks {
   /// or null on network failure.
   Future<Map<String, dynamic>?> compareFingerprint() async {
     try {
-      return (await _call('GET', '/v1/debug/fingerprint?publishableKey=${Uri.encodeComponent(publishableKey)}')).json;
+      return (await _call('GET',
+              '/v1/debug/fingerprint?publishableKey=${Uri.encodeComponent(publishableKey)}'))
+          .json;
     } catch (_) {
       return null;
     }
@@ -1125,7 +1014,8 @@ class StraitLinks {
     // SDK's 10 s timeouts, it throws into the existing 'network' path.
     final res = await (body == null
             ? _http.get(uri)
-            : _http.post(uri, headers: {'Content-Type': 'application/json'}, body: jsonEncode(body)))
+            : _http.post(uri,
+                headers: {'Content-Type': 'application/json'}, body: jsonEncode(body)))
         .timeout(const Duration(seconds: 10));
     Map<String, dynamic> json;
     try {

@@ -40,8 +40,7 @@ DoctorFile ok200(String body) => DoctorFile(200, body);
 List<String> ids(List<DoctorFinding> f) => [for (final x in f) x.id];
 DoctorFinding? byId(List<DoctorFinding> f, String id) => f.where((x) => x.id == id).firstOrNull;
 DoctorFinding okF(String id, String title) => DoctorFinding(id: id, severity: 'ok', title: title, fix: '');
-DoctorFinding errF(String id, String title, String fix) =>
-    DoctorFinding(id: id, severity: 'error', title: title, fix: fix);
+DoctorFinding errF(String id, String title, String fix) => DoctorFinding(id: id, severity: 'error', title: title, fix: fix);
 
 void main() {
   group('doctorFindings: key', () {
@@ -61,10 +60,8 @@ void main() {
     }
     for (final k in ['', 'bk_pub_x', 'pub_live_x']) {
       test('key.invalid for "$k"', () {
-        expect(
-            run(k),
-            errF('key.invalid', 'Not a publishable key',
-                'Copy the publishable key (st_pub_…) from Dashboard → Get started.'));
+        expect(run(k),
+            errF('key.invalid', 'Not a publishable key', 'Copy the publishable key (st_pub_…) from Dashboard → Get started.'));
       });
     }
   });
@@ -123,11 +120,9 @@ void main() {
         final r = run(ok200(platform == 'android' ? '[]' : aasa([])));
         expect(
             r.findings[1],
-            errF(
-                'app.none',
-                'No ${platform == 'android' ? 'Android' : 'iOS'} app is set up for acme.strait.link',
+            errF('app.none', 'No ${platform == 'android' ? 'Android' : 'iOS'} app is set up for acme.strait.link',
                 'Fill in Dashboard → Apps & stores (${platform == 'android' ? 'package name and SHA-256 fingerprint' : 'Team ID and bundle ID'}), '
-                    'wait a minute, then check again. Already done? Make sure acme.strait.link is your link domain from Dashboard → Get started.'));
+                'wait a minute, then check again. Already done? Make sure acme.strait.link is your link domain from Dashboard → Get started.'));
         expect(r.ok, isFalse);
       });
     });
@@ -231,8 +226,7 @@ void main() {
           ]
         }
       });
-      final r =
-          doctorFindings(publishableKey: pk, endpoint: ep, platform: 'ios', appId: 'com.acme.app', file: ok200(old));
+      final r = doctorFindings(publishableKey: pk, endpoint: ep, platform: 'ios', appId: 'com.acme.app', file: ok200(old));
       expect(ids(r.findings), ['key.ok', 'app.listed']);
     });
   });
@@ -252,11 +246,7 @@ void main() {
     }
 
     test('Android: one GET of assetlinks.json, returns the report', () async {
-      final (client, urls) = respond(
-          200,
-          assetlinks([
-            ('com.acme.app', [fp])
-          ]));
+      final (client, urls) = respond(200, assetlinks([('com.acme.app', [fp])]));
       final r = await make('android', client).doctor(appId: 'com.acme.app', certSha256: [fp]);
       expect(urls.map((u) => u.toString()), ['https://acme.strait.link/.well-known/assetlinks.json']);
       expect(r.ok, isTrue);

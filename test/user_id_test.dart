@@ -83,19 +83,11 @@ void main() {
     });
     test('hashes a phone number as + and its digits (v15, shared-spec ADR 0010)', () {
       expect(userIdField('+91 98765-43210'), (userId: phoneHash, userIdHashed: true));
-      for (final p in [
-        '(+91) 98765 43210',
-        '0091 98765 43210',
-        '+91\u00A098765\u00A043210',
-        '\u202A+91 98765 43210\u202C',
-        '+91\u201398765\u201343210',
-        'tel:+91-98765-43210',
-        '\uFF0B\uFF19\uFF11 \uFF19\uFF18\uFF17\uFF16\uFF15 \uFF14\uFF13\uFF12\uFF11\uFF10'
-      ]) {
+      for (final p in ['(+91) 98765 43210', '0091 98765 43210', '+91\u00A098765\u00A043210', '\u202A+91 98765 43210\u202C',
+          '+91\u201398765\u201343210', 'tel:+91-98765-43210', '\uFF0B\uFF19\uFF11 \uFF19\uFF18\uFF17\uFF16\uFF15 \uFF14\uFF13\uFF12\uFF11\uFF10']) {
         expect(userIdField(p), (userId: phoneHash, userIdHashed: true), reason: p);
       }
-      expect(userIdField('\u096F\u096E\u096D\u096C\u096B\u096A\u0969\u0968\u0967\u0966'),
-          (userId: sha256Hex('9876543210'), userIdHashed: true));
+      expect(userIdField('\u096F\u096E\u096D\u096C\u096B\u096A\u0969\u0968\u0967\u0966'), (userId: sha256Hex('9876543210'), userIdHashed: true));
       expect(userIdField('Priya\uFF20Example.com'), (userId: sha256Hex('priya\uFF20example.com'), userIdHashed: true));
       for (final id in ['98765+43210', '+91 98765 43210 ext 12', 'TEL:1234567', '98765_43210']) {
         expect(userIdField(id), (userId: id, userIdHashed: false), reason: id);

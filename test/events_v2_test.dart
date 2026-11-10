@@ -13,14 +13,14 @@ import 'package:test/test.dart';
 
 final eventIdRe = RegExp(r'^e_[a-z0-9]+_[a-z0-9]{12}$');
 const t = 1800000000000;
-const device = DeviceFields(screenWidth: 411, pixelRatio: 2.625, language: 'en', timezone: 'Asia/Kolkata');
+const device = DeviceFields(
+    screenWidth: 411, pixelRatio: 2.625, language: 'en', timezone: 'Asia/Kolkata');
 const offline = 'offline';
 
 /// Fake engine: per path a status code or [offline] (no answer). Unknown path = 404.
 class Engine {
   final Map<String, Object> routes = {'/v1/event': 202, '/v1/open': 202};
   final calls = <(String, Map<String, dynamic>?)>[];
-
   /// Per path, a reply the test releases later (the status it completes with).
   final Map<String, Future<int>> hold = {};
 
@@ -33,8 +33,10 @@ class Engine {
     return http.Response('{}', r as int);
   });
 
-  List<Map<String, dynamic>> get events => calls.where((c) => c.$1 == '/v1/event').map((c) => c.$2!).toList();
-  List<Map<String, dynamic>> get opens => calls.where((c) => c.$1 == '/v1/open').map((c) => c.$2!).toList();
+  List<Map<String, dynamic>> get events =>
+      calls.where((c) => c.$1 == '/v1/event').map((c) => c.$2!).toList();
+  List<Map<String, dynamic>> get opens =>
+      calls.where((c) => c.$1 == '/v1/open').map((c) => c.$2!).toList();
 }
 
 Future<void> settle() async {
@@ -106,15 +108,7 @@ void main() {
       expect(await h.strait.trackEvent('purchase', value: 5, currency: 'USD', eventId: 'ord_7'), isFalse);
       await settle();
       expect(h.queue, [
-        {
-          'type': 'event',
-          'at': t,
-          'event': 'purchase',
-          'platform': 'android',
-          'eventId': 'ord_7',
-          'value': 5,
-          'currency': 'USD'
-        }
+        {'type': 'event', 'at': t, 'event': 'purchase', 'platform': 'android', 'eventId': 'ord_7', 'value': 5, 'currency': 'USD'}
       ]);
       expect(h.s.data['strait.pendingOpens'], isNot(contains('st_pub_')));
       expect(await h.strait.pendingOpenReports(), 1);
@@ -146,25 +140,14 @@ void main() {
       expect(h.queue.map((q) => q['event']), ['a', 'b']);
     });
 
-    test(
-        'a retried event is sent once per flush and dropped after the engine takes it; opens and events share the queue in order',
-        () async {
+    test('a retried event is sent once per flush and dropped after the engine takes it; opens and events share the queue in order', () async {
       final h = await make();
       h.e.routes['/v1/event'] = offline;
       await h.strait.trackEvent('purchase', eventId: 'ord_9');
       await settle();
       // An open report saved earlier by the B14 path sits in the same queue.
       h.s.data['strait.pendingOpens'] = jsonEncode([
-        {
-          'openId': 'o_1_aaaaaaaaaaaa',
-          'kind': 'direct',
-          'route': 'app_link',
-          'appState': 'closed',
-          'platform': 'android',
-          'matched': true,
-          'firstLaunch': false,
-          'at': t
-        },
+        {'openId': 'o_1_aaaaaaaaaaaa', 'kind': 'direct', 'route': 'app_link', 'appState': 'closed', 'platform': 'android', 'matched': true, 'firstLaunch': false, 'at': t},
         ...h.queue,
       ]);
       h.e.routes['/v1/event'] = 202;

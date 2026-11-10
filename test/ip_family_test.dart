@@ -40,11 +40,7 @@ class Engine {
   void Function(String host)? onCall;
   Engine(this.routes, {this.offline = const {}});
   late final http.Client client = MockClient((req) async {
-    calls.add((
-      host: req.url.host,
-      path: req.url.path,
-      body: req.body.isEmpty ? null : jsonDecode(req.body) as Map<String, dynamic>
-    ));
+    calls.add((host: req.url.host, path: req.url.path, body: req.body.isEmpty ? null : jsonDecode(req.body) as Map<String, dynamic>));
     onCall?.call(req.url.host);
     if (offline.contains(req.url.host)) throw http.ClientException('offline');
     final p = routes['${req.url.host}${req.url.path}'];
@@ -95,40 +91,23 @@ void main() {
   });
 
   test('no match there, or the URL unreachable: the first answer stands', () async {
-    final a = make(Engine({
-      'hilltop.links.test/v1/match': missV6,
-      'v4.straitlink.test/v1/match': {'matched': false}
-    }));
+    final a = make(Engine({'hilltop.links.test/v1/match': missV6, 'v4.straitlink.test/v1/match': {'matched': false}}));
     await a.start();
     expect(a.events.single.matched, isFalse);
     expect(a.events.single.reason, 'no_match');
-    final b = make(Engine({'hilltop.links.test/v1/match': missV6, 'v4.straitlink.test/v1/match': hitV4},
-        offline: {'v4.straitlink.test'}));
+    final b = make(Engine({'hilltop.links.test/v1/match': missV6, 'v4.straitlink.test/v1/match': hitV4}, offline: {'v4.straitlink.test'}));
     await b.start();
     expect(b.events.single.matched, isFalse);
     expect(b.events.single.reason, 'no_match');
   });
 
   test('no second ask without the field, with a bad URL, or on the read-only checkDeferred()', () async {
-    for (final bad in [
-      null,
-      'http://v4.straitlink.test/v1/match',
-      'https://v4.straitlink.test/v1/open',
-      '$v4?x=1',
-      'javascript:alert(1)',
-      '/v1/match'
-    ]) {
-      final e = Engine({
-        'hilltop.links.test/v1/match': {...missV6, 'ipv4Match': bad},
-        'v4.straitlink.test/v1/match': hitV4
-      });
+    for (final bad in [null, 'http://v4.straitlink.test/v1/match', 'https://v4.straitlink.test/v1/open', '$v4?x=1', 'javascript:alert(1)', '/v1/match']) {
+      final e = Engine({'hilltop.links.test/v1/match': {...missV6, 'ipv4Match': bad}, 'v4.straitlink.test/v1/match': hitV4});
       await make(e).start();
       expect(e.matchHosts, ['hilltop.links.test'], reason: '$bad');
     }
-    final e = Engine({
-      'hilltop.links.test/v1/match': missV6,
-      'v4.straitlink.test/v1/match': {'matched': false}
-    });
+    final e = Engine({'hilltop.links.test/v1/match': missV6, 'v4.straitlink.test/v1/match': {'matched': false}});
     final s = make(e);
     await s.start();
     final before = e.calls.length;
@@ -146,25 +125,12 @@ void main() {
     expect(e.matchHosts.where((h) => h == 'v4.straitlink.test'), isEmpty);
   });
 
-  test('paste handoff (B19) follows the first answer: still runs when the IPv4 ask misses, never when it matches',
-      () async {
+  test('paste handoff (B19) follows the first answer: still runs when the IPv4 ask misses, never when it matches', () async {
     final pasteMiss = {...missV6}..['ios'] = {'deviceMatching': true, 'pasteHandoff': true};
-    const claimOk = {
-      'matched': true,
-      'longUrl': 'https://shop.example/x',
-      'linkId': 'lnk_1',
-      'matchMethod': 'clipboard'
-    };
-    for (final (second, expectClaim) in [
-      (<String, Object>{'matched': false}, true),
-      (hitV4, false)
-    ]) {
+    const claimOk = {'matched': true, 'longUrl': 'https://shop.example/x', 'linkId': 'lnk_1', 'matchMethod': 'clipboard'};
+    for (final (second, expectClaim) in [(<String, Object>{'matched': false}, true), (hitV4, false)]) {
       final clip = Clip();
-      final e = Engine({
-        'hilltop.links.test/v1/match': pasteMiss,
-        'v4.straitlink.test/v1/match': second,
-        'hilltop.links.test/v1/handoff/claim': claimOk
-      });
+      final e = Engine({'hilltop.links.test/v1/match': pasteMiss, 'v4.straitlink.test/v1/match': second, 'hilltop.links.test/v1/handoff/claim': claimOk});
       final s = make(e, clip: clip);
       await s.start();
       expect(e.calls.any((c) => c.path == '/v1/handoff/claim'), expectClaim);
@@ -175,15 +141,7 @@ void main() {
 
   test('ipv4MatchUrl accepts only a plain https …/v1/match URL', () {
     expect(ipv4MatchUrl('https://v4.straitlink.in/v1/match'), 'https://v4.straitlink.in/v1/match');
-    for (final bad in [
-      null,
-      1,
-      '',
-      'https://v4.straitlink.in/v1/match/',
-      'https://u:p@v4.straitlink.in/v1/match',
-      'https://v4.straitlink.in/v1/match#x',
-      'ftp://x/v1/match'
-    ]) {
+    for (final bad in [null, 1, '', 'https://v4.straitlink.in/v1/match/', 'https://u:p@v4.straitlink.in/v1/match', 'https://v4.straitlink.in/v1/match#x', 'ftp://x/v1/match']) {
       expect(ipv4MatchUrl(bad), isNull, reason: '$bad');
     }
   });

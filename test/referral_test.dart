@@ -32,8 +32,7 @@ class Clip implements StraitClipboard {
   Future<String?> readText() async => handoff;
 }
 
-StraitLinks make(Map<String, Object> routes, {String platform = 'ios', String? referrer, bool boost = false}) =>
-    StraitLinks(
+StraitLinks make(Map<String, Object> routes, {String platform = 'ios', String? referrer, bool boost = false}) => StraitLinks(
       publishableKey: pk,
       endpoint: endpoint,
       platform: platform,
@@ -53,26 +52,14 @@ void main() {
     for (final c in ['ASHA42', 'a', 'user_12-b', 'x' * 64]) {
       expect(replyReferralCode(c), c);
     }
-    for (final c in <Object?>[
-      null,
-      '',
-      'x' * 65,
-      'a b',
-      'me@example.com',
-      '+919999',
-      'ü',
-      42,
-      {},
-      ['A']
-    ]) {
+    for (final c in <Object?>[null, '', 'x' * 65, 'a b', 'me@example.com', '+919999', 'ü', 42, {}, ['A']]) {
       expect(replyReferralCode(c), isNull, reason: '$c');
     }
   });
 
   test('Android Play referrer', () async {
-    final s = make({
-      '/v1/referrer': {...matched, 'matchMethod': 'install_referrer', 'referralCode': 'ASHA42'}
-    }, platform: 'android', referrer: 'strait_link=lnk_42');
+    final s = make({'/v1/referrer': {...matched, 'matchMethod': 'install_referrer', 'referralCode': 'ASHA42'}},
+        platform: 'android', referrer: 'strait_link=lnk_42');
     await s.start();
     final ev = s.events.single;
     expect(ev.route, LinkRoute.installReferrer);
@@ -81,9 +68,7 @@ void main() {
   });
 
   test('iPhone match', () async {
-    final s = make({
-      '/v1/match': {...matched, 'matchMethod': 'exact_ext', 'referralCode': 'RAVI7'}
-    });
+    final s = make({'/v1/match': {...matched, 'matchMethod': 'exact_ext', 'referralCode': 'RAVI7'}});
     await s.start();
     expect(s.events.single.referralCode, 'RAVI7');
   });
@@ -91,10 +76,7 @@ void main() {
   test('clipboard boost claim and the Paste button', () async {
     final routes = {
       '/v1/handoff/claim': {...matched, 'matchMethod': 'clipboard', 'referralCode': 'ASHA42'},
-      '/v1/match': {
-        'matched': false,
-        'ios': {'deviceMatching': true, 'pasteHandoff': true}
-      },
+      '/v1/match': {'matched': false, 'ios': {'deviceMatching': true, 'pasteHandoff': true}},
     };
     final s = make(routes, boost: true);
     await s.start();
@@ -124,8 +106,7 @@ void main() {
       platform: 'android',
       device: device,
       installReferrer: 'strait_link=lnk_42',
-      client: MockClient((req) async =>
-          http.Response(jsonEncode({...matched, 'matchMethod': 'install_referrer', 'referralCode': 'ASHA42'}), 200)),
+      client: MockClient((req) async => http.Response(jsonEncode({...matched, 'matchMethod': 'install_referrer', 'referralCode': 'ASHA42'}), 200)),
     );
     expect(r.referralCode, 'ASHA42');
   });

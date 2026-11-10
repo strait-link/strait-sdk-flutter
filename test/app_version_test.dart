@@ -102,28 +102,8 @@ void main() {
       final s = MemoryStore()
         ..data['strait.deferredChecked'] = '1'
         ..data['strait.pendingOpens'] = jsonEncode([
-          {
-            'openId': 'o_1',
-            'kind': 'direct',
-            'route': 'app_link',
-            'appState': 'closed',
-            'platform': 'android',
-            'matched': true,
-            'firstLaunch': false,
-            'at': 1800000000000
-          },
-          {
-            'openId': 'o_2',
-            'kind': 'direct',
-            'route': 'app_link',
-            'appState': 'closed',
-            'platform': 'android',
-            'matched': true,
-            'firstLaunch': false,
-            'at': 1800000000000,
-            'appVersion': '4.11.0',
-            'sdkVersion': '0.9.6'
-          },
+          {'openId': 'o_1', 'kind': 'direct', 'route': 'app_link', 'appState': 'closed', 'platform': 'android', 'matched': true, 'firstLaunch': false, 'at': 1800000000000},
+          {'openId': 'o_2', 'kind': 'direct', 'route': 'app_link', 'appState': 'closed', 'platform': 'android', 'matched': true, 'firstLaunch': false, 'at': 1800000000000, 'appVersion': '4.11.0', 'sdkVersion': '0.9.6'},
         ]);
       await make(e, storage: s).flushOpenReports();
       final sent = e.of('/v1/open');

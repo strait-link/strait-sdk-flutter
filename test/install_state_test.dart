@@ -15,7 +15,8 @@ import 'package:test/test.dart';
 
 const tOld = 1780000000000;
 const tNew = 1790000000000;
-const device = DeviceFields(screenWidth: 390, pixelRatio: 3, language: 'en', timezone: 'Asia/Kolkata');
+const device = DeviceFields(
+    screenWidth: 390, pixelRatio: 3, language: 'en', timezone: 'Asia/Kolkata');
 
 /// Fake engine: /v1/match answers [match] (or no answer when [offline]); anything else 202.
 class Engine {
@@ -33,7 +34,8 @@ class Engine {
     return http.Response(jsonEncode({'ok': true}), 202);
   });
 
-  List<Map<String, dynamic>?> get matches => calls.where((c) => c.$1 == '/v1/match').map((c) => c.$2).toList();
+  List<Map<String, dynamic>?> get matches =>
+      calls.where((c) => c.$1 == '/v1/match').map((c) => c.$2).toList();
 }
 
 Future<List<LinkEvent>> launch(MemoryStore s, Engine e, [Future<int?> Function()? installTime]) async {
@@ -64,8 +66,7 @@ void main() {
     expect(firstLaunchState(null, null, tNew), (firstLaunch: true, clearFlag: false, storeInstallTime: '$tNew'));
     expect(firstLaunchState('1', '$tOld', null), (firstLaunch: false, clearFlag: false, storeInstallTime: null));
     expect(firstLaunchState('1', '$tOld', double.nan), (firstLaunch: false, clearFlag: false, storeInstallTime: null));
-    expect(firstLaunchState('1', '$tOld', double.infinity),
-        (firstLaunch: false, clearFlag: false, storeInstallTime: null));
+    expect(firstLaunchState('1', '$tOld', double.infinity), (firstLaunch: false, clearFlag: false, storeInstallTime: null));
   });
 
   group('start() with installTime (B6a)', () {

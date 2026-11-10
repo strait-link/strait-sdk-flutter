@@ -16,52 +16,18 @@ List<String> oracle(String endpoint, List<String> linkHosts) {
 
 void main() {
   const inputs = [
-    'https://Acme.strait.link',
-    'https://acme.strait.link/',
-    ' https://acme.strait.link/x?y#z ',
-    'HTTPS://A.B',
-    'go.brand.com',
-    'GO.Brand.com',
-    'localhost:3000',
-    'localhost:',
-    'localhost:3000x',
-    ':3000',
-    '',
-    '   ',
-    '\n',
-    'go brand.com',
-    'go.brand.com/path',
-    'https://',
-    'https:///path',
-    'ftp+x.y-z://h.com:8443/p',
-    '1http://a.com',
-    'http:/a.com',
-    'http//a.com',
-    'a://b',
-    'x-y.z',
-    '_a.com',
-    'a_b.com',
-    'https://h?q',
-    'https://h#f',
-    'https://user@h.com',
-    'https://h.com:99',
-    'été.com',
-    'https://été.com',
-    'a.com:\u0661\u0662',
-    'a.com::1',
-    'https://a.com\n',
-    'a.com\u0085',
-    '\u212A.com',
-    'https://a.com//',
-    '///',
-    'a/',
+    'https://Acme.strait.link', 'https://acme.strait.link/', ' https://acme.strait.link/x?y#z ', 'HTTPS://A.B',
+    'go.brand.com', 'GO.Brand.com', 'localhost:3000', 'localhost:', 'localhost:3000x', ':3000', '',
+    '   ', '\n', 'go brand.com', 'go.brand.com/path', 'https://', 'https:///path', 'ftp+x.y-z://h.com:8443/p',
+    '1http://a.com', 'http:/a.com', 'http//a.com', 'a://b', 'x-y.z', '_a.com', 'a_b.com', 'https://h?q', 'https://h#f',
+    'https://user@h.com', 'https://h.com:99', 'été.com', 'https://été.com', 'a.com:\u0661\u0662', 'a.com::1',
+    'https://a.com\n', 'a.com\u0085', '\u212A.com', 'https://a.com//', '///', 'a/',
   ];
   test('normalizeLinkHosts matches the RegExp version', () {
     for (final i in inputs) {
       expect(normalizeLinkHosts(i), oracle(i, const []), reason: 'endpoint ${i.codeUnits}');
       final extra = [i, i.toUpperCase()];
-      expect(normalizeLinkHosts('https://e.strait.link', extra), oracle('https://e.strait.link', extra),
-          reason: 'linkHosts ${i.codeUnits}');
+      expect(normalizeLinkHosts('https://e.strait.link', extra), oracle('https://e.strait.link', extra), reason: 'linkHosts ${i.codeUnits}');
     }
   });
   test('trimTrailingSlashes matches the RegExp version', () {
