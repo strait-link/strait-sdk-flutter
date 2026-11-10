@@ -20,14 +20,27 @@ void main() async {
     expect(attributionWindowMs, c['ATTRIBUTION_WINDOW_MS']);
     expect(installReferrerMax, c['INSTALL_REFERRER_MAX']);
     expect(userIdMax, c['USER_ID_MAX']);
+    expect(returnDays, c['RETURN_DAYS']);
+    expect(dayMs, c['DAY_MS']);
     expect(c.keys, unorderedEquals([
       'RESUME_WINDOW_MS', 'TRANSIENT_PAUSE_MS', 'OPEN_QUEUE_MAX', 'OPEN_QUEUE_MAX_AGE_MS',
-      'ATTRIBUTION_WINDOW_MS', 'INSTALL_REFERRER_MAX', 'USER_ID_MAX'
+      'ATTRIBUTION_WINDOW_MS', 'INSTALL_REFERRER_MAX', 'USER_ID_MAX',
+      'RETURN_DAYS', 'DAY_MS'
     ]));
   });
 
-  test('vectors v16', () {
-    expect(v['version'], 16);
+  test('vectors v17', () {
+    expect(v['version'], 17);
+  });
+
+  group('returnNote (B28)', () {
+    for (final c in v['returnNote'] as List) {
+      test('${c['name']}', () {
+        final e = c['expected'] as Map<String, dynamic>?;
+        expect(returnNote(c['stored'] as String?, c['now'] as num),
+            e == null ? isNull : (day: e['day'] as int, clickId: e['clickId'] as String, openId: e['openId'] as String));
+      });
+    }
   });
 
   group('userId (B27)', () {

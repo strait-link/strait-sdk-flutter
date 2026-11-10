@@ -395,7 +395,7 @@ company's app can't open a store sheet there.
 
 ## User consent / opt-out
 
-If your app asks for consent first (for example under India's DPDP Act or a GDPR consent flow in the EU), call `await links.setEnabled(false)` until the person agrees: Strait then sends no open reports or events, does no install matching, and deletes reports waiting on the device. The choice is kept across launches in your `storage`; `setEnabled(true)` turns it back on (default: on) and `isEnabled()` reads it.
+If your app asks for consent first (for example under India's DPDP Act or a GDPR consent flow in the EU), call `await links.setEnabled(false)` until the person agrees: Strait then sends no open reports or events, does no install matching, and deletes reports waiting on the device (and the install tap behind the day 1 / 7 / 30 "came back" notes, which then never resume). The choice is kept across launches in your `storage`; `setEnabled(true)` turns it back on (default: on) and `isEnabled()` reads it.
 Links that carry their own destination still reach `onLink`. A Strait short link is looked up through the engine's `/v1/lookup`, which records nothing (no tap, no open, no tap id), so it still opens the right screen; only if that lookup fails (offline) does it come back `matched: false, reason: 'disabled'`. Whether you need consent, and for what, is a question for your own legal advice.
 The legacy `resolveDeferredLink` honours the same switch when you pass it the same `storage`: while off it sends nothing (no install) and returns `MatchResult.none`.
 
@@ -479,8 +479,9 @@ carry no query or fragment except `utm_source`, `reportUrl`; expired remembered
 taps are deleted, `staleTap`) · B19 (iPhone paste handoff, chosen in the dashboard at runtime,
 `parseHandoffUrl`, `/v1/handoff/claim`, `claimHandoff`) · B22 (old Firebase
 page.link links: short → `/v1/resolve`, long → `link=` read on the device) · B23
-(`doctor()` setup check, `doctorFindings`) · B27 (`setUserId`, `userIdField`). Both
-shared vector files (conformance v14) are asserted in `dart test`.
+(`doctor()` setup check, `doctorFindings`) · B27 (`setUserId`, `userIdField`) · B28 (day 1 / 7 / 30
+"came back" notes, `strait.installTap`, `returnNote`; not released yet). Both
+shared vector files (conformance v17) are asserted in `dart test`.
 
 ## iPhone deferred links (opt-in): you choose the method (B19)
 
@@ -614,6 +615,14 @@ The client sends only coarse device fields; the **server** adds the observed IP
 and computes the signature.
 
 On Android's first launch the SDK also sends the Play install referrer string as read (`installReferrer`, contract B26) with the call that records the install, so the install keeps its campaign. Strait keeps only `utm_source`, `utm_medium`, `utm_campaign`, `utm_term` and `utm_content`; `gclid` and any other parameter in it are dropped on arrival, never stored or logged. Not sent on the debug re-check, on iPhone, or while switched off.
+
+**"Came back" notes (contract B28).** So the dashboard can show whether the people a campaign brought came back
+(D1 / D7 / D30), the SDK sends at most three tiny notes per install, ever: the first time the app starts or comes to
+the front on day 1, day 7 and day 30 after the install. Each note carries only the install's tap id (Strait's own
+random id for the tap that brought the install, which the SDK already keeps), the day number, the platform and the
+app / SDK version. No device id, no user id, no URL. Installs that no Strait link brought send nothing. Nothing is
+sent while switched off, and `setEnabled(false)` deletes the stored install tap, so that install never sends a note again.
+Never on the web.
 
 ## Test
 

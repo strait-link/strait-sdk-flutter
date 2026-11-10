@@ -139,6 +139,7 @@ const _queueKey = 'strait.pendingOpens';
 const _tapKey = 'strait.lastTap';
 const _installTimeKey = 'strait.installTime';
 const _enabledKey = 'strait.enabled';
+const _installTapKey = 'strait.installTap';
 
 /// The engine calls that record an app open or install get `appVersion` + `sdkVersion` (td2-23) at send
 /// time. Not /v1/open: an open report is stamped when it is made, so one saved offline and sent after an
@@ -269,7 +270,10 @@ class StraitLinks {
     if (lifecycle != null) {
       _subs.add(lifecycle.listen((s) {
         _tracker.onState(s, _now());
-        if (s == AppLifecycle.active) unawaited(flushOpenReports());
+        if (s == AppLifecycle.active) {
+          unawaited(flushOpenReports());
+          unawaited(_checkReturn());
+        }
       }, onError: (_) {}));
     }
     var skipEcho = initialUrl != null;
@@ -307,6 +311,8 @@ class StraitLinks {
       if (s.clearFlag) await _write(_deferredFlag, '');
       if (s.storeInstallTime != null) await _write(_installTimeKey, s.storeInstallTime!);
       firstLaunch = s.firstLaunch;
+      // B28: a new install (or a restored backup of another one) starts without an install tap.
+      if (firstLaunch) await _write(_installTapKey, '');
     }
     _firstLaunch = firstLaunch;
     if (initialUrl != null && initialUrl.isNotEmpty) {
@@ -321,6 +327,7 @@ class StraitLinks {
         _deferredDue = true; // opted out: not marked done, runs when switched back on
       }
     }
+    unawaited(_checkReturn());
     unawaited(flushOpenReports());
   }
 
@@ -351,6 +358,8 @@ class StraitLinks {
       // Opting out also deletes what was saved to send later.
       await _serial(() => _writeQueue(const []));
       _tapWrite = _tapWrite.then((_) => _storage.set(_tapKey, '')).catchError((_) {});
+      // B28: an install that opted out never sends a "came back" note again.
+      _tapWrite = _tapWrite.then((_) => _storage.set(_installTapKey, '')).catchError((_) {});
       await _tapWrite;
       return;
     }
@@ -462,7 +471,7 @@ class StraitLinks {
         final matched = r.json['matched'] == true;
         final reason = matched ? null : (_str(r.json['reason']) ?? _str(r.json['error']));
         final linkId = _str(r.json['linkId']);
-        if (matched) _noteTap(replyClickId(r.json['clickId']), t0);
+        if (matched) _noteTap(replyClickId(r.json['clickId']), t0, firstLaunch);
         if (r.json['recorded'] != true) {
           unawaited(_report({
             ...base,
@@ -488,7 +497,7 @@ class StraitLinks {
         ));
       }
     }
-    if (c.clickId != null && on) _noteTap(c.clickId, t0);
+    if (c.clickId != null && on) _noteTap(c.clickId, t0, firstLaunch);
     // Web: the page URL is an open only when it carries the tap id the engine
     // appends when it sends a tap to the web (`strait_click`); one open per tap
     // (openId `web-<tap>`), so a reload or a shared landing URL is de-duplicated
@@ -571,7 +580,7 @@ class StraitLinks {
             if (installReferrer != null) 'installReferrer': installReferrer,
           });
           if (r.json['matched'] == true) {
-            if (record) _noteTap(replyClickId(r.json['clickId'], clickId), t0);
+            if (record) _noteTap(replyClickId(r.json['clickId'], clickId), t0, true);
             final dest = _destination(_str(r.json['longUrl']));
             return LinkEvent(
               id: id, kind: LinkKind.deferred, route: LinkRoute.installReferrer,
@@ -602,7 +611,7 @@ class StraitLinks {
         } catch (_) {}
       }
       final matched = r.json['matched'] == true;
-      if (record && matched) _noteTap(replyClickId(r.json['clickId']), t0);
+      if (record && matched) _noteTap(replyClickId(r.json['clickId']), t0, true);
       final dest = _destination(matched ? _str(r.json['longUrl']) : null);
       return LinkEvent(
         id: id, kind: LinkKind.deferred, route: LinkRoute.fingerprint,
@@ -645,7 +654,7 @@ class StraitLinks {
         ...tag,
       });
       if (c.json['matched'] != true) return done(result); // not claimable: keep the match result
-      _noteTap(replyClickId(c.json['clickId']), t0);
+      _noteTap(replyClickId(c.json['clickId']), t0, true);
       final dest = _destination(_str(c.json['longUrl']));
       return done(LinkEvent(
         id: id, kind: LinkKind.deferred, route: LinkRoute.clipboard,
@@ -728,13 +737,41 @@ class StraitLinks {
   // chained so a trackEvent right after an open sees it; failures are ignored.
   Future<void> _tapWrite = Future<void>.value();
 
-  void _noteTap(String? clickId, int at) {
+  // B28: [install] = this open is the install's own first open; its tap id is kept once as the install tap.
+  void _noteTap(String? clickId, int at, [bool install = false]) {
     final value = clickId != null ? rememberTap(clickId, at) : '';
     // Checked inside the chain: a reply that lands after setEnabled(false) keeps no tap.
     _tapWrite = _tapWrite.then((_) async {
-      if (await isEnabled()) await _storage.set(_tapKey, value);
+      if (!await isEnabled()) return;
+      await _storage.set(_tapKey, value);
+      if (install && clickId != null && ((await _storage.get(_installTapKey)) ?? '').isEmpty) {
+        await _storage.set(_installTapKey, installTapValue(clickId, at));
+      }
     }).catchError((_) {});
   }
+
+  // B28: the day 1 / 7 / 30 "came back" note. Marked sent before it goes (a failed write sends nothing),
+  // one check at a time; then reported like an open (queued and retried on no answer, 429 or 5xx).
+  Future<void>? _returnCheck;
+
+  Future<void> _checkReturn() => _returnCheck ??= () async {
+        if (_onWeb || !await isEnabled()) return;
+        await _tapWrite;
+        final stored = await _storage.get(_installTapKey);
+        final now = _now();
+        final note = returnNote(stored, now);
+        if (note == null) return;
+        final tap = jsonDecode(stored!) as Map;
+        final sent = tap['sent'] is List ? (tap['sent'] as List).whereType<num>().toList() : <num>[];
+        await _storage.set(_installTapKey, installTapValue(note.clickId, tap['at'] as num, [...sent, note.day]));
+        if (!await isEnabled()) return; // switched off meanwhile
+        await _report({
+          'type': 'return', 'openId': note.openId, 'kind': 'return', 'day': note.day, 'clickId': note.clickId,
+          'platform': platform, 'at': now, ...versionFields(_appVersion),
+        });
+      }()
+          .catchError((_) {})
+          .whenComplete(() => _returnCheck = null);
 
   /// B18: delete an expired remembered tap instead of only ignoring it.
   /// Re-read inside the write chain so a newer tap written meanwhile is never lost.
@@ -796,6 +833,9 @@ class StraitLinks {
           ..remove('type')
           ..remove('at');
         res = await _call('POST', '/v1/event', event);
+      } else if (report['type'] == 'return') {
+        // B28: no device class, nothing but the note.
+        res = await _call('POST', '/v1/open', {'publishableKey': publishableKey, ...report}..remove('type'));
       } else {
         // B14: deviceClass is added at send time, never saved in the queue.
         res = await _call('POST', '/v1/open', {'publishableKey': publishableKey, ...report, ..._deviceClassField()});

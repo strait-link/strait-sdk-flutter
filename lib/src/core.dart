@@ -352,6 +352,40 @@ String? eventClickId(String? stored, int now, [String? explicit]) {
   return age >= 0 && age <= attributionWindowMs ? clickId.toLowerCase() : null;
 }
 
+/// B28: the days after the install that send a "came back" note, and a day in ms.
+const returnDays = [1, 7, 30];
+const dayMs = 24 * 60 * 60 * 1000;
+
+/// Storage value for the install's tap (key `strait.installTap`, B28):
+/// `{"clickId":…,"at":<epoch ms>,"sent":[…]}`.
+String installTapValue(String clickId, num at, [List<num> sent = const []]) =>
+    jsonEncode({'clickId': clickId.toLowerCase(), 'at': at, 'sent': sent});
+
+/// The "came back" note due at [now] (contract B28), or null: the install tap
+/// ([stored], see [installTapValue]) is readable, `day` = whole days since the
+/// install open is 1, 7 or 30, and that day was not sent yet. At most three
+/// per install, ever.
+({int day, String clickId, String openId})? returnNote(String? stored, num now) {
+  if (stored == null || stored.isEmpty) return null;
+  Object? tap;
+  try {
+    tap = jsonDecode(stored);
+  } catch (_) {
+    return null;
+  }
+  if (tap is! Map) return null;
+  final clickId = tap['clickId'];
+  final at = tap['at'];
+  final sent = tap['sent'];
+  if (clickId is! String || !_clickIdRe.hasMatch(clickId)) return null;
+  if (at is! num || !at.isFinite || at <= 0 || now < at) return null;
+  final day = ((now - at) / dayMs).floor();
+  if (!returnDays.contains(day)) return null;
+  if (sent is List && sent.any((d) => d is num && d == day)) return null;
+  final id = clickId.toLowerCase();
+  return (day: day, clickId: id, openId: 'r$day-$id');
+}
+
 /// True when the remembered tap ([stored], see [rememberTap]) is set but can
 /// no longer be used: unreadable, malformed, or opened more than
 /// [attributionWindowMs] before [now] (or after it). The SDK then deletes it
